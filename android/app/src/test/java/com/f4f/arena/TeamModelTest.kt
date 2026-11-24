@@ -93,4 +93,25 @@ class TeamModelTest {
         assertEquals(14, response.data.assignedCount)
         assertEquals(1, response.data.substitutesCount)
     }
+
+    @Test
+    fun testSwapAndMovePlayerSerialization() {
+        val gson = Gson()
+
+        val swap = com.f4f.arena.data.model.SwapPlayersRequest("p-1", "p-2")
+        val swapJson = gson.toJson(swap)
+        assertTrue(swapJson.contains(""""player_a_id":"p-1""""))
+        assertTrue(swapJson.contains(""""player_b_id":"p-2""""))
+
+        val move = com.f4f.arena.data.model.MovePlayerRequest(
+            playerId = "p-3",
+            targetTeamId = "t-1",
+            isSubstitute = false,
+            assignedPosition = "DEFENDER"
+        )
+        val moveJson = gson.toJson(move)
+        assertTrue(moveJson.contains(""""player_id":"p-3""""))
+        assertTrue(moveJson.contains(""""target_team_id":"t-1""""))
+        assertTrue(moveJson.contains(""""is_substitute":false"""))
+    }
 }

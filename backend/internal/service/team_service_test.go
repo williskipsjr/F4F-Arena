@@ -74,6 +74,30 @@ func (m *mockTeamStore) GetTeamsByMatchID(ctx context.Context, matchID string) (
 	return m.response, nil
 }
 
+func (m *mockTeamStore) SwapPlayers(ctx context.Context, matchID, playerAID, playerBID string) error {
+	if playerAID == "" || playerBID == "" {
+		return errors.New("player IDs required")
+	}
+	if playerAID == playerBID {
+		return domain.ErrCannotSwapSelf
+	}
+	return nil
+}
+
+func (m *mockTeamStore) MovePlayer(ctx context.Context, matchID string, input domain.MovePlayerInput) error {
+	if input.PlayerID == "" {
+		return errors.New("player ID required")
+	}
+	return nil
+}
+
+func (m *mockTeamStore) FinaliseMatch(ctx context.Context, matchID string) error {
+	if m.response != nil {
+		m.response.Status = domain.StatusFinalised
+	}
+	return nil
+}
+
 type mockMatchStoreForTeam struct {
 	match     *domain.Match
 	attendees []domain.MatchAttendee
@@ -259,5 +283,88 @@ func TestTeamService_GetTeams(t *testing.T) {
 	}
 	if resp.TeamCount != 2 {
 		t.Errorf("expected 2 teams, got %d", resp.TeamCount)
+	}
+}
+
+func TestTeamService_SwapPlayers(t *testing.T) {
+	matchStore := &mockMatchStoreForTeam{}
+	teamStore := &mockTeamStore{
+		response: &domain.MatchTeamsResponse{
+			MatchID:   "match-1",
+			TeamCount: 2,
+		},
+	}
+	svc := NewTeamService(matchStore, teamStore)
+
+	// Valid swap
+	resp, err := svc.SwapPlayers(context.Background(), "match-1", domain.SwapPlayersInput{
+		PlayerAID: "p-1",
+		PlayerBID: "p-2",
+	})
+	if err != nil {
+		t.Fatalf("unexpected swap error: %v", err)
+	}
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+
+	// Missing ID
+	_, err = svc.SwapPlayers(context.Background(), "match-1", domain.SwapPlayersInput{
+		PlayerAID: "",
+		PlayerBID: "p-2",
+	})
+	if err == nil {
+		t.Error("expected error for empty player ID")
+	}
+}
+
+func TestTeamService_MovePlayer(t *testing.T) {
+	matchStore := &mockMatchStoreForTeam{}
+	teamStore := &mockTeamStore{
+		response: &domain.MatchTeamsResponse{
+			MatchID:   "match-1",
+			TeamCount: 2,
+		},
+	}
+	svc := NewTeamService(matchStore, teamStore)
+
+	targetTeam := "team-uuid-1"
+	resp, err := svc.MovePlayer(context.Background(), "match-1", domain.MovePlayerInput{
+		PlayerID:     "p-1",
+		TargetTeamID: &targetTeam,
+		IsSubstitute: false,
+	})
+	if err != nil {
+		t.Fatalf("unexpected move error: %v", err)
+	}
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+
+	// Empty player ID
+	_, err = svc.MovePlayer(context.Background(), "match-1", domain.MovePlayerInput{
+		PlayerID: "",
+	})
+	if err == nil {
+		t.Error("expected error for empty player ID")
+	}
+}
+
+func TestTeamService_FinaliseMatch(t *testing.T) {
+	matchStore := &mockMatchStoreForTeam{}
+	teamStore := &mockTeamStore{
+		response: &domain.MatchTeamsResponse{
+			MatchID: "match-1",
+			Status:  domain.StatusTeamsGenerated,
+		},
+	}
+	svc := NewTeamService(matchStore, teamStore)
+
+	resp, err := svc.FinaliseMatch(context.Background(), "match-1")
+	if err != nil {
+		t.Fatalf("unexpected finalise error: %v", err)
+	}
+	if resp.Status != domain.StatusFinalised {
+		t.Errorf("expected status FINALISED, got %s", resp.Status)
 	}
 }

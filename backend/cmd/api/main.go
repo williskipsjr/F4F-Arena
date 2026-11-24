@@ -125,6 +125,9 @@ func main() {
 		}
 		if teamHandler != nil {
 			protected.Post("/api/v1/matches/{id}/generate-teams", teamHandler.GenerateTeams)
+			protected.Post("/api/v1/matches/{id}/assignments/swap", teamHandler.SwapPlayers)
+			protected.Post("/api/v1/matches/{id}/assignments/move", teamHandler.MovePlayer)
+			protected.Post("/api/v1/matches/{id}/finalise", teamHandler.FinaliseMatch)
 		}
 	})
 

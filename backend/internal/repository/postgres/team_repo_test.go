@@ -17,7 +17,7 @@ func TestPostgres_TeamPersistence_Live(t *testing.T) {
 		dbURL = "postgres://f4f_admin:f4f_secure_password@localhost:5432/f4f_arena?sslmode=disable"
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	pool, err := pgxpool.New(ctx, dbURL)
@@ -46,7 +46,6 @@ func TestPostgres_TeamPersistence_Live(t *testing.T) {
 		t.Fatalf("failed creating match: %v", err)
 	}
 	defer func() {
-		// Clean up match
 		_, _ = pool.Exec(context.Background(), "DELETE FROM matches WHERE id = $1", match.ID)
 	}()
 
@@ -56,7 +55,7 @@ func TestPostgres_TeamPersistence_Live(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed fetching players: %v", err)
 	}
-	if len(players) < 14 {
+	if len(players) < 16 {
 		t.Fatalf("not enough players seeded: %d", len(players))
 	}
 
@@ -115,6 +114,77 @@ func TestPostgres_TeamPersistence_Live(t *testing.T) {
 		t.Errorf("expected status TEAMS_GENERATED, got %s", saved.Status)
 	}
 
-	t.Logf("Live persistence verification successful: %d teams, %d players assigned, %d substitutes",
-		saved.TeamCount, saved.AssignedCount, saved.SubstitutesCount)
+	// 6. Test Swap Players (Team player <-> Bench player)
+	team1PlayerID := saved.Teams[0].Players[0].ID
+	subPlayerID := saved.Substitutes[0].ID
+
+	if err := teamRepo.SwapPlayers(ctx, match.ID, team1PlayerID, subPlayerID); err != nil {
+		t.Fatalf("failed swapping team player and sub player: %v", err)
+	}
+
+	afterSwap, err := teamRepo.GetTeamsByMatchID(ctx, match.ID)
+	if err != nil {
+		t.Fatalf("failed getting teams after swap: %v", err)
+	}
+	// Verify subPlayer is now on Team 1
+	foundOnTeam1 := false
+	for _, p := range afterSwap.Teams[0].Players {
+		if p.ID == subPlayerID {
+			foundOnTeam1 = true
+			if !p.IsManualOverride {
+				t.Error("expected IsManualOverride to be true for swapped player")
+			}
+		}
+	}
+	if !foundOnTeam1 {
+		t.Errorf("expected sub player %s to be on Team 1 after swap", subPlayerID)
+	}
+	// Verify team1Player is now on bench
+	foundOnBench := false
+	for _, s := range afterSwap.Substitutes {
+		if s.ID == team1PlayerID {
+			foundOnBench = true
+			if !s.IsManualOverride {
+				t.Error("expected IsManualOverride to be true for benched player")
+			}
+		}
+	}
+	if !foundOnBench {
+		t.Errorf("expected previous team player %s to be on bench after swap", team1PlayerID)
+	}
+
+	// 7. Test Move Player (late arrival player 16 moved to Team 2)
+	player16ID := players[15].ID
+	targetTeamID := afterSwap.Teams[1].ID
+	err = teamRepo.MovePlayer(ctx, match.ID, domain.MovePlayerInput{
+		PlayerID:     player16ID,
+		TargetTeamID: &targetTeamID,
+		IsSubstitute: false,
+	})
+	if err != nil {
+		t.Fatalf("failed moving late arrival player to Team 2: %v", err)
+	}
+
+	afterMove, err := teamRepo.GetTeamsByMatchID(ctx, match.ID)
+	if err != nil {
+		t.Fatalf("failed getting teams after move: %v", err)
+	}
+	if afterMove.AssignedCount != 15 {
+		t.Errorf("expected 15 assigned players after moving player 16, got %d", afterMove.AssignedCount)
+	}
+
+	// 8. Test Finalise Match
+	if err := teamRepo.FinaliseMatch(ctx, match.ID); err != nil {
+		t.Fatalf("failed finalising match: %v", err)
+	}
+
+	afterFinalise, err := teamRepo.GetTeamsByMatchID(ctx, match.ID)
+	if err != nil {
+		t.Fatalf("failed getting teams after finalise: %v", err)
+	}
+	if afterFinalise.Status != domain.StatusFinalised {
+		t.Errorf("expected match status FINALISED, got %s", afterFinalise.Status)
+	}
+
+	t.Logf("Live Phase 4 operations verified: Swap, Move (late arrival), and Finalise all succeeded!")
 }

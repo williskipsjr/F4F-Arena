@@ -3,8 +3,10 @@ package com.f4f.arena.ui.match
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.f4f.arena.data.api.NetworkClient
+import com.f4f.arena.data.model.MatchStatus
 import com.f4f.arena.data.model.MatchTeamsData
 import com.f4f.arena.data.model.SubstitutePolicy
+import com.f4f.arena.data.model.TeamPlayerDetail
 import com.f4f.arena.data.repository.TeamRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,6 +18,8 @@ sealed interface TeamBoardUiState {
     data class Success(
         val data: MatchTeamsData,
         val isGenerating: Boolean = false,
+        val isMutating: Boolean = false,
+        val selectedPlayerForSwap: TeamPlayerDetail? = null,
         val bannerMessage: String? = null
     ) : TeamBoardUiState
     data class Error(val message: String) : TeamBoardUiState
@@ -34,12 +38,10 @@ class TeamBoardViewModel(
         currentMatchId = matchId
         viewModelScope.launch {
             _uiState.value = TeamBoardUiState.Loading
-            // Try fetching existing teams first
             val getResult = repository.getTeams(matchId)
             if (getResult.isSuccess && getResult.getOrNull()?.teams?.isNotEmpty() == true) {
                 _uiState.value = TeamBoardUiState.Success(data = getResult.getOrNull()!!)
             } else {
-                // Not generated yet, trigger generation
                 generateTeams(matchId, subPolicy = null, token = token)
             }
         }
@@ -53,7 +55,7 @@ class TeamBoardViewModel(
         viewModelScope.launch {
             val prevSuccess = (_uiState.value as? TeamBoardUiState.Success)
             if (prevSuccess != null) {
-                _uiState.value = prevSuccess.copy(isGenerating = true)
+                _uiState.value = prevSuccess.copy(isGenerating = true, selectedPlayerForSwap = null)
             } else {
                 _uiState.value = TeamBoardUiState.Loading
             }
@@ -63,6 +65,7 @@ class TeamBoardViewModel(
                 _uiState.value = TeamBoardUiState.Success(
                     data = data,
                     isGenerating = false,
+                    selectedPlayerForSwap = null,
                     bannerMessage = "Teams generated successfully!"
                 )
             }.onFailure { err ->
@@ -74,6 +77,114 @@ class TeamBoardViewModel(
                 } else {
                     _uiState.value = TeamBoardUiState.Error(err.message ?: "Failed to generate teams")
                 }
+            }
+        }
+    }
+
+    fun onPlayerClicked(player: TeamPlayerDetail, token: String = "dev-token") {
+        val state = (_uiState.value as? TeamBoardUiState.Success) ?: return
+        val matchId = currentMatchId ?: return
+
+        // If match is finalised, editing is locked
+        if (state.data.status == MatchStatus.FINALISED) {
+            _uiState.value = state.copy(bannerMessage = "Match is finalised. Re-open to edit.")
+            return
+        }
+
+        val currentSelected = state.selectedPlayerForSwap
+        if (currentSelected == null) {
+            // Step 1: Select candidate for swap
+            _uiState.value = state.copy(
+                selectedPlayerForSwap = player,
+                bannerMessage = "Selected ${player.displayName}. Tap another player or substitute to swap."
+            )
+        } else if (currentSelected.id == player.id) {
+            // Deselect
+            _uiState.value = state.copy(
+                selectedPlayerForSwap = null,
+                bannerMessage = null
+            )
+        } else {
+            // Step 2: Second player tapped! Execute swap
+            executeSwap(matchId, currentSelected.id, player.id, token)
+        }
+    }
+
+    fun clearSwapSelection() {
+        val state = (_uiState.value as? TeamBoardUiState.Success) ?: return
+        _uiState.value = state.copy(selectedPlayerForSwap = null, bannerMessage = null)
+    }
+
+    private fun executeSwap(matchId: String, playerAId: String, playerBId: String, token: String) {
+        viewModelScope.launch {
+            val state = (_uiState.value as? TeamBoardUiState.Success) ?: return@launch
+            _uiState.value = state.copy(isMutating = true, selectedPlayerForSwap = null)
+
+            val result = repository.swapPlayers(token, matchId, playerAId, playerBId)
+            result.onSuccess { updatedData ->
+                _uiState.value = TeamBoardUiState.Success(
+                    data = updatedData,
+                    isMutating = false,
+                    selectedPlayerForSwap = null,
+                    bannerMessage = "Players swapped successfully! [Manual Override]"
+                )
+            }.onFailure { err ->
+                _uiState.value = state.copy(
+                    isMutating = false,
+                    selectedPlayerForSwap = null,
+                    bannerMessage = "Swap failed: ${err.message}"
+                )
+            }
+        }
+    }
+
+    fun movePlayer(
+        playerId: String,
+        targetTeamId: String?,
+        isSubstitute: Boolean,
+        token: String = "dev-token"
+    ) {
+        val matchId = currentMatchId ?: return
+        viewModelScope.launch {
+            val state = (_uiState.value as? TeamBoardUiState.Success) ?: return@launch
+            _uiState.value = state.copy(isMutating = true, selectedPlayerForSwap = null)
+
+            val result = repository.movePlayer(token, matchId, playerId, targetTeamId, isSubstitute)
+            result.onSuccess { updatedData ->
+                _uiState.value = TeamBoardUiState.Success(
+                    data = updatedData,
+                    isMutating = false,
+                    selectedPlayerForSwap = null,
+                    bannerMessage = "Player moved successfully! [Manual Override]"
+                )
+            }.onFailure { err ->
+                _uiState.value = state.copy(
+                    isMutating = false,
+                    bannerMessage = "Move failed: ${err.message}"
+                )
+            }
+        }
+    }
+
+    fun finaliseMatch(token: String = "dev-token") {
+        val matchId = currentMatchId ?: return
+        viewModelScope.launch {
+            val state = (_uiState.value as? TeamBoardUiState.Success) ?: return@launch
+            _uiState.value = state.copy(isMutating = true)
+
+            val result = repository.finaliseMatch(token, matchId)
+            result.onSuccess { updatedData ->
+                _uiState.value = TeamBoardUiState.Success(
+                    data = updatedData,
+                    isMutating = false,
+                    selectedPlayerForSwap = null,
+                    bannerMessage = "Match teams finalised! Ready for WhatsApp export ⚽"
+                )
+            }.onFailure { err ->
+                _uiState.value = state.copy(
+                    isMutating = false,
+                    bannerMessage = "Finalise failed: ${err.message}"
+                )
             }
         }
     }

@@ -1,15 +1,15 @@
 package com.f4f.arena.ui.match
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.f4f.arena.data.model.MatchStatus
 import com.f4f.arena.data.model.Position
 import com.f4f.arena.data.model.SubstitutePolicy
 import com.f4f.arena.data.model.TeamDetail
@@ -34,6 +35,8 @@ fun TeamBoardScreen(
     viewModel: TeamBoardViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var showFinaliseDialog by remember { mutableStateOf(false) }
+    var movingPlayer by remember { mutableStateOf<TeamPlayerDetail?>(null) }
 
     LaunchedEffect(matchId) {
         viewModel.loadOrGenerateTeams(matchId)
@@ -53,8 +56,14 @@ fun TeamBoardScreen(
                     titleContentColor = MaterialTheme.colorScheme.onPrimary
                 ),
                 actions = {
-                    IconButton(onClick = { viewModel.generateTeams(matchId) }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Regenerate", tint = MaterialTheme.colorScheme.onPrimary)
+                    val successState = uiState as? TeamBoardUiState.Success
+                    if (successState != null && successState.data.status != MatchStatus.FINALISED) {
+                        IconButton(onClick = { viewModel.generateTeams(matchId) }) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Regenerate", tint = MaterialTheme.colorScheme.onPrimary)
+                        }
+                        IconButton(onClick = { showFinaliseDialog = true }) {
+                            Icon(Icons.Default.Lock, contentDescription = "Finalise Teams", tint = MaterialTheme.colorScheme.onPrimary)
+                        }
                     }
                 }
             )
@@ -70,7 +79,7 @@ fun TeamBoardScreen(
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             CircularProgressIndicator()
-                            Text("Balancing positions & generating teams...", style = MaterialTheme.typography.bodyMedium)
+                            Text("Loading teams...", style = MaterialTheme.typography.bodyMedium)
                         }
                     }
                 }
@@ -90,12 +99,73 @@ fun TeamBoardScreen(
                 }
                 is TeamBoardUiState.Success -> {
                     val data = state.data
+                    val isFinalised = data.status == MatchStatus.FINALISED
+
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
+                        // Swap Mode Active Banner
+                        if (state.selectedPlayerForSwap != null) {
+                            item {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.weight(1f),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(Icons.Default.SwapHoriz, contentDescription = "Swap", tint = MaterialTheme.colorScheme.primary)
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column {
+                                                Text(
+                                                    text = "Swap Mode Active",
+                                                    fontWeight = FontWeight.Bold,
+                                                    style = MaterialTheme.typography.titleSmall
+                                                )
+                                                Text(
+                                                    text = "Tap any other player to swap with ${state.selectedPlayerForSwap.displayName}",
+                                                    style = MaterialTheme.typography.bodySmall
+                                                )
+                                            }
+                                        }
+                                        TextButton(onClick = { viewModel.clearSwapSelection() }) {
+                                            Text("Cancel")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Banner feedback message
+                        if (state.bannerMessage != null && state.selectedPlayerForSwap == null) {
+                            item {
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant
+                                ) {
+                                    Text(
+                                        text = state.bannerMessage,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+
                         // Overview Header Card
                         item {
                             Card(
@@ -115,13 +185,14 @@ fun TeamBoardScreen(
                                         )
                                         Surface(
                                             shape = RoundedCornerShape(12.dp),
-                                            color = MaterialTheme.colorScheme.primaryContainer
+                                            color = if (isFinalised) Color(0xFFE8F5E9) else MaterialTheme.colorScheme.primaryContainer
                                         ) {
                                             Text(
-                                                text = "${data.assignedCount} Active" + if (data.substitutesCount > 0) " • ${data.substitutesCount} Subs" else "",
+                                                text = if (isFinalised) "FINALISED 🔒" else "${data.assignedCount} Active • ${data.substitutesCount} Subs",
+                                                color = if (isFinalised) Color(0xFF2E7D32) else MaterialTheme.colorScheme.onPrimaryContainer,
                                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                                 style = MaterialTheme.typography.labelMedium,
-                                                fontWeight = FontWeight.SemiBold
+                                                fontWeight = FontWeight.Bold
                                             )
                                         }
                                     }
@@ -132,24 +203,25 @@ fun TeamBoardScreen(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
 
-                                    // Policy Switch Buttons
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        OutlinedButton(
-                                            onClick = { viewModel.generateTeams(matchId, SubstitutePolicy.STRICT_SUBSTITUTES) },
-                                            modifier = Modifier.weight(1f),
-                                            enabled = !state.isGenerating && data.subPolicy != SubstitutePolicy.STRICT_SUBSTITUTES
+                                    if (!isFinalised) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
-                                            Text("Strict Subs", fontSize = 12.sp)
-                                        }
-                                        OutlinedButton(
-                                            onClick = { viewModel.generateTeams(matchId, SubstitutePolicy.DISTRIBUTE_ALL) },
-                                            modifier = Modifier.weight(1f),
-                                            enabled = !state.isGenerating && data.subPolicy != SubstitutePolicy.DISTRIBUTE_ALL
-                                        ) {
-                                            Text("Distribute All", fontSize = 12.sp)
+                                            OutlinedButton(
+                                                onClick = { viewModel.generateTeams(matchId, SubstitutePolicy.STRICT_SUBSTITUTES) },
+                                                modifier = Modifier.weight(1f),
+                                                enabled = !state.isGenerating && data.subPolicy != SubstitutePolicy.STRICT_SUBSTITUTES
+                                            ) {
+                                                Text("Strict Subs", fontSize = 12.sp)
+                                            }
+                                            OutlinedButton(
+                                                onClick = { viewModel.generateTeams(matchId, SubstitutePolicy.DISTRIBUTE_ALL) },
+                                                modifier = Modifier.weight(1f),
+                                                enabled = !state.isGenerating && data.subPolicy != SubstitutePolicy.DISTRIBUTE_ALL
+                                            ) {
+                                                Text("Distribute All", fontSize = 12.sp)
+                                            }
                                         }
                                     }
                                 }
@@ -188,15 +260,109 @@ fun TeamBoardScreen(
 
                         // Teams Cards
                         items(data.teams) { team ->
-                            TeamCard(team = team)
+                            InteractiveTeamCard(
+                                team = team,
+                                selectedPlayerId = state.selectedPlayerForSwap?.id,
+                                isFinalised = isFinalised,
+                                onPlayerClick = { p -> viewModel.onPlayerClicked(p) },
+                                onPlayerMoveClick = { p -> movingPlayer = p }
+                            )
                         }
 
                         // Substitutes / Bench Section
                         if (data.substitutes.isNotEmpty()) {
                             item {
-                                SubstitutesCard(substitutes = data.substitutes)
+                                InteractiveSubstitutesCard(
+                                    substitutes = data.substitutes,
+                                    selectedPlayerId = state.selectedPlayerForSwap?.id,
+                                    isFinalised = isFinalised,
+                                    onPlayerClick = { p -> viewModel.onPlayerClicked(p) },
+                                    onPlayerMoveClick = { p -> movingPlayer = p }
+                                )
                             }
                         }
+
+                        // Bottom Finalise Action Button
+                        if (!isFinalised) {
+                            item {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    onClick = { showFinaliseDialog = true },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(50.dp),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(Icons.Default.Lock, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Finalise Match Teams 🔒", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                }
+                            }
+                        }
+                    }
+
+                    // Finalise Confirmation Dialog
+                    if (showFinaliseDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showFinaliseDialog = false },
+                            title = { Text("Finalise Match Teams?") },
+                            text = { Text("This will lock the current teams and player allocations. You can still export to WhatsApp directly after finalising.") },
+                            confirmButton = {
+                                Button(
+                                    onClick = {
+                                        showFinaliseDialog = false
+                                        viewModel.finaliseMatch()
+                                    }
+                                ) {
+                                    Text("Confirm Finalise")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showFinaliseDialog = false }) {
+                                    Text("Cancel")
+                                }
+                            }
+                        )
+                    }
+
+                    // Move Player Dialog
+                    if (movingPlayer != null) {
+                        val p = movingPlayer!!
+                        AlertDialog(
+                            onDismissRequest = { movingPlayer = null },
+                            title = { Text("Move ${p.displayName}") },
+                            text = {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("Select a destination team or move to bench:", style = MaterialTheme.typography.bodyMedium)
+                                    data.teams.forEach { team ->
+                                        OutlinedButton(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            onClick = {
+                                                viewModel.movePlayer(p.id, team.id, isSubstitute = false)
+                                                movingPlayer = null
+                                            }
+                                        ) {
+                                            Text("Move to ${team.teamName} (${team.players.size} players)")
+                                        }
+                                    }
+                                    OutlinedButton(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        onClick = {
+                                            viewModel.movePlayer(p.id, null, isSubstitute = true)
+                                            movingPlayer = null
+                                        }
+                                    ) {
+                                        Text("Move to Bench / Substitutes")
+                                    }
+                                }
+                            },
+                            confirmButton = {},
+                            dismissButton = {
+                                TextButton(onClick = { movingPlayer = null }) {
+                                    Text("Cancel")
+                                }
+                            }
+                        )
                     }
                 }
             }
@@ -205,7 +371,13 @@ fun TeamBoardScreen(
 }
 
 @Composable
-fun TeamCard(team: TeamDetail) {
+fun InteractiveTeamCard(
+    team: TeamDetail,
+    selectedPlayerId: String?,
+    isFinalised: Boolean,
+    onPlayerClick: (TeamPlayerDetail) -> Unit,
+    onPlayerMoveClick: (TeamPlayerDetail) -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -266,49 +438,95 @@ fun TeamCard(team: TeamDetail) {
 
             Divider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
 
-            // Player Roster
+            // Player List with interactive tap & move actions
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 team.players.forEach { p ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .clip(CircleShape)
-                                    .background(positionColor(p.assignedPosition)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = p.assignedPosition.name.take(1),
-                                    color = Color.White,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = p.displayName,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium
+                    val isSelected = p.id == selectedPlayerId
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .then(
+                                if (isSelected) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
+                                else Modifier
                             )
-                        }
-
-                        if (p.isEmergencyKeeper) {
-                            Surface(
-                                shape = RoundedCornerShape(4.dp),
-                                color = Color(0xFFFFF3E0)
-                            ) {
+                            .clickable(enabled = !isFinalised) { onPlayerClick(p) },
+                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else Color.Transparent
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp, horizontal = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(positionColor(p.assignedPosition)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = p.assignedPosition.name.take(1),
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "Needs Emergency GK",
-                                    color = Color(0xFFE65100),
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                    text = p.displayName,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium
                                 )
+                                if (p.isManualOverride) {
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = MaterialTheme.colorScheme.secondaryContainer
+                                    ) {
+                                        Text(
+                                            text = "Manual",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontSize = 9.sp,
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (p.isEmergencyKeeper) {
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = Color(0xFFFFF3E0)
+                                    ) {
+                                        Text(
+                                            text = "Emergency GK",
+                                            color = Color(0xFFE65100),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                }
+
+                                if (!isFinalised) {
+                                    IconButton(
+                                        onClick = { onPlayerMoveClick(p) },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.MoreVert,
+                                            contentDescription = "Move Options",
+                                            modifier = Modifier.size(18.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -319,7 +537,13 @@ fun TeamCard(team: TeamDetail) {
 }
 
 @Composable
-fun SubstitutesCard(substitutes: List<TeamPlayerDetail>) {
+fun InteractiveSubstitutesCard(
+    substitutes: List<TeamPlayerDetail>,
+    selectedPlayerId: String?,
+    isFinalised: Boolean,
+    onPlayerClick: (TeamPlayerDetail) -> Unit,
+    onPlayerMoveClick: (TeamPlayerDetail) -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -352,47 +576,77 @@ fun SubstitutesCard(substitutes: List<TeamPlayerDetail>) {
             Divider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
 
             substitutes.forEach { s ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clip(CircleShape)
-                            .background(positionColor(s.primaryPosition)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = s.primaryPosition.name.take(1),
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
+                val isSelected = s.id == selectedPlayerId
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .then(
+                            if (isSelected) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
+                            else Modifier
                         )
+                        .clickable(enabled = !isFinalised) { onPlayerClick(s) },
+                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else Color.Transparent
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp, horizontal = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .clip(CircleShape)
+                                    .background(positionColor(s.primaryPosition)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = s.primaryPosition.name.take(1),
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = s.displayName,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            if (s.isManualOverride) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = MaterialTheme.colorScheme.secondaryContainer
+                                ) {
+                                    Text(
+                                        text = "Manual",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontSize = 9.sp,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        if (!isFinalised) {
+                            IconButton(
+                                onClick = { onPlayerMoveClick(s) },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.MoreVert,
+                                    contentDescription = "Move Options",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = s.displayName,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
                 }
             }
         }
-    }
-}
-
-@Composable
-fun PositionPillMini(pos: String, count: Int, color: Color) {
-    Surface(
-        shape = RoundedCornerShape(4.dp),
-        color = color.copy(alpha = 0.15f)
-    ) {
-        Text(
-            text = "$pos $count",
-            color = color,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-        )
     }
 }
