@@ -18,6 +18,8 @@ import (
 	"github.com/williskipsjr/f4f-arena/backend/internal/config"
 	"github.com/williskipsjr/f4f-arena/backend/internal/database"
 	"github.com/williskipsjr/f4f-arena/backend/internal/handler"
+	"github.com/williskipsjr/f4f-arena/backend/internal/repository/postgres"
+	"github.com/williskipsjr/f4f-arena/backend/internal/service"
 )
 
 const AppVersion = "1.0.0"
@@ -38,6 +40,14 @@ func main() {
 	} else {
 		log.Println("[F4F Arena] Successfully connected to PostgreSQL database.")
 		defer db.Close()
+	}
+
+	// Repositories & Services
+	var playerHandler *handler.PlayerHandler
+	if db != nil && db.Pool != nil {
+		playerRepo := postgres.NewPlayerRepository(db.Pool)
+		playerService := service.NewPlayerService(playerRepo)
+		playerHandler = handler.NewPlayerHandler(playerService)
 	}
 
 	// Token & Auth Services
@@ -70,8 +80,12 @@ func main() {
 	// Public Routes
 	r.Get("/health", healthHandler.ServeHTTP)
 	r.Post("/api/v1/auth/login", authHandler.Login)
+	if playerHandler != nil {
+		r.Get("/api/v1/players", playerHandler.List)
+		r.Get("/api/v1/players/{id}", playerHandler.Get)
+	}
 
-	// Protected Routes (Sample ping for admin verification)
+	// Protected Routes (Admin mutations)
 	r.Group(func(protected chi.Router) {
 		protected.Use(tokenService.Middleware)
 		protected.Get("/api/v1/auth/verify", func(w http.ResponseWriter, r *http.Request) {
@@ -80,6 +94,10 @@ func main() {
 			w.WriteHeader(http.StatusOK)
 			_, _ = fmt.Fprintf(w, `{"status":"authenticated","user":"%s","role":"%s"}`, claims.Username, claims.Role)
 		})
+		if playerHandler != nil {
+			protected.Post("/api/v1/players", playerHandler.Create)
+			protected.Patch("/api/v1/players/{id}", playerHandler.Update)
+		}
 	})
 
 	server := &http.Server{

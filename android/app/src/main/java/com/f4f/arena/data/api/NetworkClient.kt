@@ -40,4 +40,8 @@ object NetworkClient {
     val authApi: AuthApi by lazy {
         retrofit.create(AuthApi::class.java)
     }
+
+    val playerApi: PlayerApi by lazy {
+        retrofit.create(PlayerApi::class.java)
+    }
 }

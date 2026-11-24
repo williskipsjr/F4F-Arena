@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -24,7 +25,7 @@ func main() {
 	}
 
 	cfg := config.Load()
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	conn, err := pgx.Connect(ctx, cfg.DatabaseURL)
@@ -49,42 +50,109 @@ func main() {
 		migrationsDir = filepath.Join("backend", "migrations")
 	}
 
-	var targetFile string
+	files, err := os.ReadDir(migrationsDir)
+	if err != nil {
+		log.Fatalf("Failed to read migrations directory %s: %v", migrationsDir, err)
+	}
+
+	// Fetch applied migrations
+	rows, err := conn.Query(ctx, "SELECT version FROM schema_migrations")
+	if err != nil {
+		log.Fatalf("Failed querying applied migrations: %v", err)
+	}
+	applied := make(map[string]bool)
+	for rows.Next() {
+		var v string
+		if err := rows.Scan(&v); err == nil {
+			applied[v] = true
+		}
+	}
+	rows.Close()
+
 	if action == "up" {
-		targetFile = filepath.Join(migrationsDir, "000001_initial_schema.up.sql")
+		var upFiles []string
+		for _, f := range files {
+			if strings.HasSuffix(f.Name(), ".up.sql") {
+				upFiles = append(upFiles, f.Name())
+			}
+		}
+		sort.Strings(upFiles)
+
+		for _, fileName := range upFiles {
+			version := strings.TrimSuffix(fileName, ".up.sql")
+			if applied[version] {
+				log.Printf("[Migrate] Skipping already applied migration: %s", version)
+				continue
+			}
+
+			filePath := filepath.Join(migrationsDir, fileName)
+			content, err := os.ReadFile(filePath)
+			if err != nil {
+				log.Fatalf("Failed to read file %s: %v", filePath, err)
+			}
+
+			tx, err := conn.Begin(ctx)
+			if err != nil {
+				log.Fatalf("Failed to begin transaction: %v", err)
+			}
+
+			log.Printf("[Migrate] Applying %s...", fileName)
+			if _, err := tx.Exec(ctx, string(content)); err != nil {
+				_ = tx.Rollback(ctx)
+				log.Fatalf("Failed applying %s: %v", fileName, err)
+			}
+
+			if _, err := tx.Exec(ctx, "INSERT INTO schema_migrations (version) VALUES ($1)", version); err != nil {
+				_ = tx.Rollback(ctx)
+				log.Fatalf("Failed recording version %s: %v", version, err)
+			}
+
+			if err := tx.Commit(ctx); err != nil {
+				log.Fatalf("Failed to commit %s: %v", fileName, err)
+			}
+			log.Printf("[Migrate] Successfully applied %s", version)
+		}
 	} else {
-		targetFile = filepath.Join(migrationsDir, "000001_initial_schema.down.sql")
+		// Rollback latest migration
+		var appliedVersions []string
+		for v := range applied {
+			appliedVersions = append(appliedVersions, v)
+		}
+		sort.Sort(sort.Reverse(sort.StringSlice(appliedVersions)))
+
+		if len(appliedVersions) == 0 {
+			fmt.Println("No migrations to rollback.")
+			return
+		}
+
+		latest := appliedVersions[0]
+		downFile := filepath.Join(migrationsDir, latest+".down.sql")
+		content, err := os.ReadFile(downFile)
+		if err != nil {
+			log.Fatalf("Failed to read down migration %s: %v", downFile, err)
+		}
+
+		tx, err := conn.Begin(ctx)
+		if err != nil {
+			log.Fatalf("Failed to begin transaction: %v", err)
+		}
+
+		log.Printf("[Migrate] Rolling back %s...", latest)
+		if _, err := tx.Exec(ctx, string(content)); err != nil {
+			_ = tx.Rollback(ctx)
+			log.Fatalf("Failed rolling back %s: %v", latest, err)
+		}
+
+		if _, err := tx.Exec(ctx, "DELETE FROM schema_migrations WHERE version = $1", latest); err != nil {
+			_ = tx.Rollback(ctx)
+			log.Fatalf("Failed removing version record %s: %v", latest, err)
+		}
+
+		if err := tx.Commit(ctx); err != nil {
+			log.Fatalf("Failed to commit rollback %s: %v", latest, err)
+		}
+		log.Printf("[Migrate] Successfully rolled back %s", latest)
 	}
 
-	content, err := os.ReadFile(targetFile)
-	if err != nil {
-		log.Fatalf("Failed to read migration file %s: %v", targetFile, err)
-	}
-
-	tx, err := conn.Begin(ctx)
-	if err != nil {
-		log.Fatalf("Failed to begin transaction: %v", err)
-	}
-	defer tx.Rollback(ctx)
-
-	log.Printf("[Migrate] Executing migration: %s...", targetFile)
-	if _, err := tx.Exec(ctx, string(content)); err != nil {
-		log.Fatalf("Failed executing migration SQL: %v", err)
-	}
-
-	version := "000001_initial_schema"
-	if action == "up" {
-		_, err = tx.Exec(ctx, `INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT (version) DO NOTHING`, version)
-	} else {
-		_, err = tx.Exec(ctx, `DELETE FROM schema_migrations WHERE version = $1`, version)
-	}
-	if err != nil {
-		log.Fatalf("Failed to update schema_migrations version: %v", err)
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		log.Fatalf("Failed to commit migration transaction: %v", err)
-	}
-
-	fmt.Printf("Migration '%s' executed successfully!\n", action)
+	fmt.Printf("Migration '%s' process completed!\n", action)
 }
