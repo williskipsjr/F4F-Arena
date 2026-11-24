@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import com.f4f.arena.ui.HealthScreen
 import com.f4f.arena.ui.match.AttendanceScreen
 import com.f4f.arena.ui.match.MatchSetupScreen
+import com.f4f.arena.ui.match.TeamBoardScreen
 import com.f4f.arena.ui.roster.RosterScreen
 import com.f4f.arena.ui.theme.F4FArenaTheme
 
@@ -32,6 +33,7 @@ class MainActivity : ComponentActivity() {
             F4FArenaTheme {
                 var currentDestination by remember { mutableStateOf(AppDestination.MATCHES) }
                 var activeAttendanceMatchId by remember { mutableStateOf<String?>(null) }
+                var activeTeamBoardMatchId by remember { mutableStateOf<String?>(null) }
 
                 Scaffold(
                     bottomBar = {
@@ -41,6 +43,7 @@ class MainActivity : ComponentActivity() {
                                 onClick = {
                                     currentDestination = AppDestination.MATCHES
                                     activeAttendanceMatchId = null
+                                    activeTeamBoardMatchId = null
                                 },
                                 icon = { Icon(Icons.Default.SportsSoccer, contentDescription = "Matches") },
                                 label = { Text("Matches") }
@@ -67,20 +70,29 @@ class MainActivity : ComponentActivity() {
                     ) {
                         when (currentDestination) {
                             AppDestination.MATCHES -> {
-                                if (activeAttendanceMatchId == null) {
-                                    MatchSetupScreen(
-                                        onOpenAttendance = { matchId ->
-                                            activeAttendanceMatchId = matchId
-                                        }
-                                    )
-                                } else {
-                                    AttendanceScreen(
-                                        matchId = activeAttendanceMatchId!!,
-                                        onBack = { activeAttendanceMatchId = null },
-                                        onProceedToMatchmaking = { _ ->
-                                            // Phase 3 ready
-                                        }
-                                    )
+                                when {
+                                    activeTeamBoardMatchId != null -> {
+                                        TeamBoardScreen(
+                                            matchId = activeTeamBoardMatchId!!,
+                                            onBack = { activeTeamBoardMatchId = null }
+                                        )
+                                    }
+                                    activeAttendanceMatchId != null -> {
+                                        AttendanceScreen(
+                                            matchId = activeAttendanceMatchId!!,
+                                            onBack = { activeAttendanceMatchId = null },
+                                            onProceedToMatchmaking = { matchId ->
+                                                activeTeamBoardMatchId = matchId
+                                            }
+                                        )
+                                    }
+                                    else -> {
+                                        MatchSetupScreen(
+                                            onOpenAttendance = { matchId ->
+                                                activeAttendanceMatchId = matchId
+                                            }
+                                        )
+                                    }
                                 }
                             }
                             AppDestination.ROSTER -> RosterScreen()
