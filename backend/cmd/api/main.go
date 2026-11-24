@@ -44,10 +44,15 @@ func main() {
 
 	// Repositories & Services
 	var playerHandler *handler.PlayerHandler
+	var matchHandler *handler.MatchHandler
 	if db != nil && db.Pool != nil {
 		playerRepo := postgres.NewPlayerRepository(db.Pool)
 		playerService := service.NewPlayerService(playerRepo)
 		playerHandler = handler.NewPlayerHandler(playerService)
+
+		matchRepo := postgres.NewMatchRepository(db.Pool)
+		matchService := service.NewMatchService(matchRepo)
+		matchHandler = handler.NewMatchHandler(matchService)
 	}
 
 	// Token & Auth Services
@@ -84,6 +89,11 @@ func main() {
 		r.Get("/api/v1/players", playerHandler.List)
 		r.Get("/api/v1/players/{id}", playerHandler.Get)
 	}
+	if matchHandler != nil {
+		r.Get("/api/v1/matches", matchHandler.List)
+		r.Get("/api/v1/matches/{id}", matchHandler.Get)
+		r.Get("/api/v1/matches/{id}/attendees", matchHandler.GetAttendees)
+	}
 
 	// Protected Routes (Admin mutations)
 	r.Group(func(protected chi.Router) {
@@ -97,6 +107,13 @@ func main() {
 		if playerHandler != nil {
 			protected.Post("/api/v1/players", playerHandler.Create)
 			protected.Patch("/api/v1/players/{id}", playerHandler.Update)
+		}
+		if matchHandler != nil {
+			protected.Post("/api/v1/matches", matchHandler.Create)
+			protected.Patch("/api/v1/matches/{id}", matchHandler.Update)
+			protected.Put("/api/v1/matches/{id}/attendees", matchHandler.SyncAttendees)
+			protected.Post("/api/v1/matches/{id}/attendees/late", matchHandler.AddLateArrival)
+			protected.Delete("/api/v1/matches/{id}/attendees/{playerId}", matchHandler.RemoveAttendee)
 		}
 	})
 
