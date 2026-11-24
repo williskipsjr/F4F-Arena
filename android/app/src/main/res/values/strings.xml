@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">F4F Arena</string>
+    <string name="health_check_title">F4F Arena — System Connectivity</string>
+    <string name="check_status_button">Check Backend Status</string>
+    <string name="backend_url_label">Backend URL:</string>
+    <string name="status_connected">Connected</string>
+    <string name="status_disconnected">Disconnected</string>
+    <string name="status_checking">Verifying Connection…</string>
+</resources>

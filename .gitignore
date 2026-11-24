@@ -1,0 +1,40 @@
+# General / OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Go Build & Binaries
+backend/bin/
+backend/dist/
+*.exe
+*.test
+*.out
+vendor/
+
+# Environment Variables & Secrets
+.env
+*.env.local
+*.env.*.local
+deployments/.env
+
+# Android & Gradle
+android/.gradle/
+android/build/
+android/*/build/
+android/local.properties
+android/.cxx/
+android/*.apk
+android/*.aab
+android/*.keystore
+android/*.jks
+*.hprof
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+.project
+.classpath
+.settings/

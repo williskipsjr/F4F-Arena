@@ -1,0 +1,8 @@
+<resources>
+    <color name="pitch_green_primary">#1B5E20</color>
+    <color name="pitch_green_dark">#0D3B13</color>
+    <color name="turf_accent">#4CAF50</color>
+    <color name="status_ok">#2E7D32</color>
+    <color name="status_error">#C62828</color>
+    <color name="background_light">#F8F9FA</color>
+</resources>

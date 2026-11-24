@@ -1,0 +1,13 @@
+# Local Android SDK and Device Configuration Example
+# Copy this file to 'local.properties' and adjust for your local workstation
+
+# Path to the Android SDK
+# sdk.dir=/home/williskipsjr/Android/Sdk
+# Or on Windows: sdk.dir=C\:\\Users\\username\\AppData\\Local\\Android\\Sdk
+# Or on macOS: sdk.dir=/Users/username/Library/Android/sdk
+
+# API Base URL configuration:
+# For Android Emulator: 
+# f4f.api.base_url=http://10.0.2.2:8080/
+# For Physical Device over Wi-Fi (replace with your development machine's LAN IP):
+# f4f.api.base_url=http://192.168.1.100:8080/
