@@ -119,6 +119,18 @@ data class CastVoteRequest(
     @SerializedName("vote") val vote: String
 )
 
+data class MatchVoteDetail(
+    @SerializedName("player_id") val playerId: String,
+    @SerializedName("display_name") val displayName: String,
+    @SerializedName("primary_position") val primaryPosition: Position,
+    @SerializedName("vote") val vote: String,
+    @SerializedName("voted_at") val votedAt: String
+)
+
+data class MatchVotesResponse(
+    @SerializedName("data") val data: List<MatchVoteDetail>
+)
+
 data class SyncAttendeesRequest(
     @SerializedName("player_ids") val playerIds: List<String>
 )

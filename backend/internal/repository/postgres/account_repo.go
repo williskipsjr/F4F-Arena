@@ -153,6 +153,35 @@ func (r *AccountRepository) Authenticate(ctx context.Context, username, password
 	return &info, nil
 }
 
+// EnsureAdminPlayer returns an existing player ID for the admin or creates one so the admin can also vote IN/OUT.
+func (r *AccountRepository) EnsureAdminPlayer(ctx context.Context, adminName string) (string, error) {
+	name := strings.TrimSpace(adminName)
+	if name == "" {
+		name = "Admin"
+	}
+	var playerID string
+	err := r.pool.QueryRow(ctx, `
+		SELECT id FROM players WHERE LOWER(display_name) = LOWER($1) LIMIT 1
+	`, name).Scan(&playerID)
+	if err == nil {
+		return playerID, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return "", err
+	}
+
+	now := time.Now().UTC()
+	err = r.pool.QueryRow(ctx, `
+		INSERT INTO players (display_name, primary_position, is_active, notes, created_at, updated_at)
+		VALUES ($1, 'MIDFIELDER', true, 'Community Admin', $2, $2)
+		RETURNING id
+	`, name, now).Scan(&playerID)
+	if err != nil {
+		return "", err
+	}
+	return playerID, nil
+}
+
 func hashPassword(password string) (string, error) {
 	salt := make([]byte, 16)
 	if _, err := rand.Read(salt); err != nil {

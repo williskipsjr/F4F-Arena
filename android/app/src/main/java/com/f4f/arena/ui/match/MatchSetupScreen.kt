@@ -4,7 +4,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -19,6 +21,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.f4f.arena.data.model.Match
 import com.f4f.arena.data.model.MatchFormat
 import com.f4f.arena.data.model.MatchStatus
+import com.f4f.arena.data.model.MatchVoteDetail
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,7 +38,23 @@ fun MatchSetupScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showCreateDialog by remember { mutableStateOf(false) }
+    var votesDialogMatch by remember { mutableStateOf<Match?>(null) }
+    var votesLoading by remember { mutableStateOf(false) }
+    var votesList by remember { mutableStateOf<List<MatchVoteDetail>>(emptyList()) }
+    var votesError by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
+
+    fun openVotesDialog(match: Match) {
+        votesDialogMatch = match
+        votesLoading = true
+        votesError = null
+        votesList = emptyList()
+        viewModel.loadMatchVotes(match.id) { res ->
+            votesLoading = false
+            res.onSuccess { votesList = it }
+                .onFailure { votesError = it.localizedMessage ?: "Failed to load votes" }
+        }
+    }
 
     val actionMessage = (uiState as? MatchUiState.Success)?.actionMessage
     LaunchedEffect(actionMessage) {
@@ -123,11 +145,12 @@ fun MatchSetupScreen(
                                     onSelectFormat = { fmt ->
                                         viewModel.updateMatchFormat(match.id, fmt)
                                     },
+                                    onViewVotes = { openVotesDialog(match) },
                                     onClick = {
                                         if (isAdmin) {
                                             onOpenAttendance(match.id)
-                                        } else if (match.status == MatchStatus.TEAMS_GENERATED || match.status == MatchStatus.FINALISED) {
-                                            onOpenTeams(match.id)
+                                        } else {
+                                            openVotesDialog(match)
                                         }
                                     },
                                     onOpenTeams = { onOpenTeams(match.id) }
@@ -166,6 +189,16 @@ fun MatchSetupScreen(
                     }
                 )
             }
+            if (votesDialogMatch != null) {
+                PollVotesDialog(
+                    match = votesDialogMatch!!,
+                    isLoading = votesLoading,
+                    votes = votesList,
+                    errorMessage = votesError,
+                    onRefresh = { openVotesDialog(votesDialogMatch!!) },
+                    onDismiss = { votesDialogMatch = null }
+                )
+            }
         }
     }
 }
@@ -176,6 +209,7 @@ fun MatchCard(
     isAdmin: Boolean = true,
     onVote: (String) -> Unit = {},
     onSelectFormat: (MatchFormat) -> Unit = {},
+    onViewVotes: () -> Unit = {},
     onClick: () -> Unit,
     onOpenTeams: () -> Unit = {}
 ) {
@@ -249,6 +283,14 @@ fun MatchCard(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
+                    }
+                    TextButton(
+                        onClick = onViewVotes,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                    ) {
+                        Icon(Icons.Default.People, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Who Voted")
                     }
                 }
 
@@ -452,4 +494,150 @@ fun CreateMatchDialog(
             TextButton(enabled = !isCreating, onClick = onDismiss) { Text("Cancel") }
         }
     )
+}
+
+@Composable
+fun PollVotesDialog(
+    match: Match,
+    isLoading: Boolean,
+    votes: List<MatchVoteDetail>,
+    errorMessage: String?,
+    onRefresh: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val inVotes = votes.filter { it.vote == "IN" }
+    val outVotes = votes.filter { it.vote == "OUT" }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Column {
+                Text("${match.title} — Votes", fontWeight = FontWeight.Bold)
+                Text(
+                    text = "${inVotes.size} IN • ${outVotes.size} OUT",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        },
+        text = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 120.dp, max = 380.dp)
+            ) {
+                when {
+                    isLoading -> {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    }
+                    errorMessage != null -> {
+                        Column(
+                            modifier = Modifier.align(Alignment.Center),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(errorMessage, color = MaterialTheme.colorScheme.error)
+                            Button(onClick = onRefresh) { Text("Retry") }
+                        }
+                    }
+                    votes.isEmpty() -> {
+                        Text(
+                            text = "No votes yet. Be the first to vote!",
+                            modifier = Modifier.align(Alignment.Center),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    else -> {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            if (inVotes.isNotEmpty()) {
+                                Text(
+                                    text = "IN (${inVotes.size})",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF2E7D32),
+                                    style = MaterialTheme.typography.titleSmall
+                                )
+                                inVotes.forEach { v -> VoteRowItem(v, isIn = true) }
+                            }
+                            if (outVotes.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "OUT (${outVotes.size})",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFC62828),
+                                    style = MaterialTheme.typography.titleSmall
+                                )
+                                outVotes.forEach { v -> VoteRowItem(v, isIn = false) }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onRefresh) { Text("Refresh") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        }
+    )
+}
+
+@Composable
+private fun VoteRowItem(vote: MatchVoteDetail, isIn: Boolean) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = if (isIn) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "${vote.primaryPosition.emoji} ${vote.displayName}",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp
+                )
+                Text(
+                    text = vote.primaryPosition.label,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                text = formatVoteTime(vote.votedAt),
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+private fun formatVoteTime(isoString: String): String {
+    val formats = listOf(
+        "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+        "yyyy-MM-dd'T'HH:mm:ss'Z'",
+        "yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'"
+    )
+    for (pattern in formats) {
+        try {
+            val parser = SimpleDateFormat(pattern, Locale.US).apply {
+                timeZone = TimeZone.getTimeZone("UTC")
+            }
+            val date = parser.parse(isoString) ?: continue
+            val out = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
+            return out.format(date)
+        } catch (_: Exception) {
+        }
+    }
+    return isoString.take(16).replace("T", " ")
 }

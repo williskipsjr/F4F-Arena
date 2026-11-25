@@ -365,3 +365,59 @@ func (r *MatchRepository) GetPlayerVotesMap(ctx context.Context, playerID string
 	}
 	return result, nil
 }
+
+// GetMatchVotes returns all IN/OUT votes for a match with player details and vote timestamps.
+func (r *MatchRepository) GetMatchVotes(ctx context.Context, matchID string) ([]domain.MatchVoteDetail, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT v.player_id, p.display_name, p.primary_position, v.vote, v.voted_at
+		FROM match_votes v
+		JOIN players p ON p.id = v.player_id
+		WHERE v.match_id = $1
+		ORDER BY v.vote ASC, v.voted_at DESC
+	`, matchID)
+	if err != nil {
+		return nil, fmt.Errorf("failed fetching match votes: %w", err)
+	}
+	defer rows.Close()
+
+	votes := make([]domain.MatchVoteDetail, 0)
+	for rows.Next() {
+		var item domain.MatchVoteDetail
+		var posStr string
+		if err := rows.Scan(&item.PlayerID, &item.DisplayName, &posStr, &item.Vote, &item.VotedAt); err != nil {
+			return nil, fmt.Errorf("failed scanning match vote: %w", err)
+		}
+		item.PrimaryPosition = domain.Position(posStr)
+		votes = append(votes, item)
+	}
+	return votes, nil
+}
+
+// EnsureAdminPlayerID resolves or creates a player profile for the admin account.
+func (r *MatchRepository) EnsureAdminPlayerID(ctx context.Context, adminName string) (string, error) {
+	name := strings.TrimSpace(adminName)
+	if name == "" {
+		name = "Admin"
+	}
+	var playerID string
+	err := r.pool.QueryRow(ctx, `
+		SELECT id FROM players WHERE LOWER(display_name) = LOWER($1) LIMIT 1
+	`, name).Scan(&playerID)
+	if err == nil {
+		return playerID, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return "", err
+	}
+
+	now := time.Now().UTC()
+	err = r.pool.QueryRow(ctx, `
+		INSERT INTO players (display_name, primary_position, is_active, notes, created_at, updated_at)
+		VALUES ($1, 'MIDFIELDER', true, 'Community Admin', $2, $2)
+		RETURNING id
+	`, name, now).Scan(&playerID)
+	if err != nil {
+		return "", err
+	}
+	return playerID, nil
+}

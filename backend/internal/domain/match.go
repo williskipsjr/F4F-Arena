@@ -170,6 +170,14 @@ type CastVoteInput struct {
 	PlayerID *string `json:"player_id,omitempty"`
 }
 
+type MatchVoteDetail struct {
+	PlayerID        string    `json:"player_id"`
+	DisplayName     string    `json:"display_name"`
+	PrimaryPosition Position  `json:"primary_position"`
+	Vote            string    `json:"vote"`
+	VotedAt         time.Time `json:"voted_at"`
+}
+
 type SyncAttendeesInput struct {
 	PlayerIDs []string `json:"player_ids"`
 }

@@ -32,6 +32,11 @@ interface MatchApi {
         @Body request: CastVoteRequest
     ): Response<MatchResponse>
 
+    @GET("api/v1/matches/{id}/votes")
+    suspend fun getMatchVotes(
+        @Path("id") id: String
+    ): Response<MatchVotesResponse>
+
     @GET("api/v1/matches/{id}")
     suspend fun getMatch(
         @Path("id") id: String

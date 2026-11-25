@@ -225,8 +225,12 @@ func (h *MatchHandler) CastVote(w http.ResponseWriter, r *http.Request) {
 	playerID := ""
 	if claims != nil && claims.PlayerID != "" {
 		playerID = claims.PlayerID
-	} else if claims != nil && claims.Role == "ADMIN" && input.PlayerID != nil {
-		playerID = *input.PlayerID
+	} else if claims != nil && claims.Role == "ADMIN" {
+		if input.PlayerID != nil && *input.PlayerID != "" {
+			playerID = *input.PlayerID
+		} else if pid, err := h.voteRepo.EnsureAdminPlayerID(r.Context(), claims.Username); err == nil {
+			playerID = pid
+		}
 	}
 	if playerID == "" {
 		writeError(w, http.StatusBadRequest, "PLAYER_REQUIRED", "Only player accounts (or admin specifying player_id) can vote")
@@ -245,5 +249,23 @@ func (h *MatchHandler) CastVote(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"data": match,
+	})
+}
+
+func (h *MatchHandler) GetVotes(w http.ResponseWriter, r *http.Request) {
+	if h.voteRepo == nil {
+		writeError(w, http.StatusServiceUnavailable, "DB_UNAVAILABLE", "Voting unavailable")
+		return
+	}
+
+	matchID := chi.URLParam(r, "id")
+	votes, err := h.voteRepo.GetMatchVotes(r.Context(), matchID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to fetch match votes: "+err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"data": votes,
 	})
 }

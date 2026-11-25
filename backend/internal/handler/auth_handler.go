@@ -110,7 +110,13 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	// 1. Check Admin credentials first
 	if req.Username == h.adminUsername && req.Password == h.adminPassword {
-		token, expiresAt, err := h.tokenService.GenerateTokenWithRole(req.Username, "ADMIN", "")
+		adminPlayerID := ""
+		if h.accountRepo != nil {
+			if pid, err := h.accountRepo.EnsureAdminPlayer(r.Context(), req.Username); err == nil {
+				adminPlayerID = pid
+			}
+		}
+		token, expiresAt, err := h.tokenService.GenerateTokenWithRole(req.Username, "ADMIN", adminPlayerID)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to generate authorization token")
 			return
@@ -120,6 +126,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			TokenType:   "Bearer",
 			ExpiresAt:   expiresAt.UTC(),
 			Role:        "ADMIN",
+			PlayerID:    adminPlayerID,
 			DisplayName: "Admin",
 		})
 		return

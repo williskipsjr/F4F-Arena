@@ -102,6 +102,7 @@ func main() {
 		r.Get("/api/v1/matches", matchHandler.List)
 		r.Get("/api/v1/matches/{id}", matchHandler.Get)
 		r.Get("/api/v1/matches/{id}/attendees", matchHandler.GetAttendees)
+		r.Get("/api/v1/matches/{id}/votes", matchHandler.GetVotes)
 	}
 	if teamHandler != nil {
 		r.Get("/api/v1/matches/{id}/teams", teamHandler.GetTeams)

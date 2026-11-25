@@ -79,6 +79,20 @@ class MatchRepository(
             }
         }
 
+    suspend fun getMatchVotes(matchId: String): Result<List<MatchVoteDetail>> =
+        withContext(Dispatchers.IO) {
+            try {
+                val response = matchApi.getMatchVotes(matchId)
+                if (response.isSuccessful && response.body() != null) {
+                    Result.success(response.body()!!.data)
+                } else {
+                    Result.failure(Exception("Failed to load votes: HTTP ${response.code()}"))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
     suspend fun getMatch(id: String): Result<Match> =
         withContext(Dispatchers.IO) {
             try {

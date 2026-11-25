@@ -7,6 +7,7 @@ import com.f4f.arena.data.auth.SessionManager
 import com.f4f.arena.data.model.CreateMatchRequest
 import com.f4f.arena.data.model.Match
 import com.f4f.arena.data.model.MatchFormat
+import com.f4f.arena.data.model.MatchVoteDetail
 import com.f4f.arena.data.model.UpdateMatchRequest
 import com.f4f.arena.data.repository.MatchRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -130,5 +131,15 @@ class MatchViewModel(
     fun clearActionMessage() {
         val current = _uiState.value as? MatchUiState.Success ?: return
         _uiState.value = current.copy(actionMessage = null)
+    }
+
+    fun loadMatchVotes(
+        matchId: String,
+        onResult: (Result<List<MatchVoteDetail>>) -> Unit
+    ) {
+        viewModelScope.launch {
+            val res = repository.getMatchVotes(matchId)
+            onResult(res)
+        }
     }
 }
