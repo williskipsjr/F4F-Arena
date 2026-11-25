@@ -14,8 +14,28 @@ interface MatchApi {
 
     @GET("api/v1/matches")
     suspend fun listMatches(
+        @Header("Authorization") bearerToken: String? = null,
         @Query("status") status: String? = null
     ): Response<MatchListResponse>
+
+    @PATCH("api/v1/matches/{id}")
+    suspend fun updateMatch(
+        @Header("Authorization") bearerToken: String,
+        @Path("id") id: String,
+        @Body request: UpdateMatchRequest
+    ): Response<MatchResponse>
+
+    @POST("api/v1/matches/{id}/vote")
+    suspend fun castVote(
+        @Header("Authorization") bearerToken: String,
+        @Path("id") id: String,
+        @Body request: CastVoteRequest
+    ): Response<MatchResponse>
+
+    @GET("api/v1/matches/{id}/votes")
+    suspend fun getMatchVotes(
+        @Path("id") id: String
+    ): Response<MatchVotesResponse>
 
     @GET("api/v1/matches/{id}")
     suspend fun getMatch(

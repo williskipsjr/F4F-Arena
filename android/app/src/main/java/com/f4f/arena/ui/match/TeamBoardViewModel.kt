@@ -41,7 +41,7 @@ class TeamBoardViewModel(
             val getResult = repository.getTeams(matchId)
             if (getResult.isSuccess) {
                 val existing = getResult.getOrNull()
-                if (existing != null && existing.teams.isNotEmpty()) {
+                if (existing != null && existing.teams.orEmpty().isNotEmpty()) {
                     _uiState.value = TeamBoardUiState.Success(data = existing)
                 } else {
                     generateTeams(matchId, subPolicy = null, token = token)

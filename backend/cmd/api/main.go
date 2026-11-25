@@ -42,30 +42,33 @@ func main() {
 		defer db.Close()
 	}
 
+	// Token & Auth Services
+	tokenService := auth.NewTokenService(cfg.JWTSecret, cfg.TokenExpiryHours)
+
 	// Repositories & Services
 	var playerHandler *handler.PlayerHandler
 	var matchHandler *handler.MatchHandler
 	var teamHandler *handler.TeamHandler
+	var accountRepo *postgres.AccountRepository
 	if db != nil && db.Pool != nil {
+		accountRepo = postgres.NewAccountRepository(db.Pool)
+
 		playerRepo := postgres.NewPlayerRepository(db.Pool)
 		playerService := service.NewPlayerService(playerRepo)
 		playerHandler = handler.NewPlayerHandler(playerService)
 
 		matchRepo := postgres.NewMatchRepository(db.Pool)
 		matchService := service.NewMatchService(matchRepo)
-		matchHandler = handler.NewMatchHandler(matchService)
+		matchHandler = handler.NewMatchHandler(matchService).WithVoting(matchRepo, tokenService)
 
 		teamRepo := postgres.NewTeamRepository(db.Pool)
 		teamService := service.NewTeamService(matchRepo, teamRepo)
 		teamHandler = handler.NewTeamHandler(teamService)
 	}
 
-	// Token & Auth Services
-	tokenService := auth.NewTokenService(cfg.JWTSecret, cfg.TokenExpiryHours)
-
 	// HTTP Handlers
 	healthHandler := handler.NewHealthHandler(db, AppVersion)
-	authHandler := handler.NewAuthHandler(cfg.AdminUsername, cfg.AdminPassword, tokenService)
+	authHandler := handler.NewAuthHandler(cfg.AdminUsername, cfg.AdminPassword, tokenService).WithAccountRepo(accountRepo)
 
 	// Router Setup
 	r := chi.NewRouter()
@@ -90,6 +93,7 @@ func main() {
 	// Public Routes
 	r.Get("/health", healthHandler.ServeHTTP)
 	r.Post("/api/v1/auth/login", authHandler.Login)
+	r.Post("/api/v1/auth/register", authHandler.Register)
 	if playerHandler != nil {
 		r.Get("/api/v1/players", playerHandler.List)
 		r.Get("/api/v1/players/{id}", playerHandler.Get)
@@ -98,38 +102,47 @@ func main() {
 		r.Get("/api/v1/matches", matchHandler.List)
 		r.Get("/api/v1/matches/{id}", matchHandler.Get)
 		r.Get("/api/v1/matches/{id}/attendees", matchHandler.GetAttendees)
+		r.Get("/api/v1/matches/{id}/votes", matchHandler.GetVotes)
 	}
 	if teamHandler != nil {
 		r.Get("/api/v1/matches/{id}/teams", teamHandler.GetTeams)
 		r.Get("/api/v1/matches/{id}/whatsapp-export", teamHandler.GetWhatsAppExport)
 	}
 
-	// Protected Routes (Admin mutations)
-	r.Group(func(protected chi.Router) {
-		protected.Use(tokenService.Middleware)
-		protected.Get("/api/v1/auth/verify", func(w http.ResponseWriter, r *http.Request) {
+	// Authenticated Routes (Players + Admin)
+	r.Group(func(authed chi.Router) {
+		authed.Use(tokenService.Middleware)
+		authed.Get("/api/v1/auth/verify", func(w http.ResponseWriter, r *http.Request) {
 			claims, _ := r.Context().Value(auth.AdminContextKey).(*auth.Claims)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			_, _ = fmt.Fprintf(w, `{"status":"authenticated","user":"%s","role":"%s"}`, claims.Username, claims.Role)
 		})
-		if playerHandler != nil {
-			protected.Post("/api/v1/players", playerHandler.Create)
-			protected.Patch("/api/v1/players/{id}", playerHandler.Update)
-		}
 		if matchHandler != nil {
-			protected.Post("/api/v1/matches", matchHandler.Create)
-			protected.Patch("/api/v1/matches/{id}", matchHandler.Update)
-			protected.Put("/api/v1/matches/{id}/attendees", matchHandler.SyncAttendees)
-			protected.Post("/api/v1/matches/{id}/attendees/late", matchHandler.AddLateArrival)
-			protected.Delete("/api/v1/matches/{id}/attendees/{playerId}", matchHandler.RemoveAttendee)
+			authed.Post("/api/v1/matches/{id}/vote", matchHandler.CastVote)
 		}
-		if teamHandler != nil {
-			protected.Post("/api/v1/matches/{id}/generate-teams", teamHandler.GenerateTeams)
-			protected.Post("/api/v1/matches/{id}/assignments/swap", teamHandler.SwapPlayers)
-			protected.Post("/api/v1/matches/{id}/assignments/move", teamHandler.MovePlayer)
-			protected.Post("/api/v1/matches/{id}/finalise", teamHandler.FinaliseMatch)
-		}
+
+		// Admin-only Mutations
+		authed.Group(func(admin chi.Router) {
+			admin.Use(tokenService.RequireAdmin)
+			if playerHandler != nil {
+				admin.Post("/api/v1/players", playerHandler.Create)
+				admin.Patch("/api/v1/players/{id}", playerHandler.Update)
+			}
+			if matchHandler != nil {
+				admin.Post("/api/v1/matches", matchHandler.Create)
+				admin.Patch("/api/v1/matches/{id}", matchHandler.Update)
+				admin.Put("/api/v1/matches/{id}/attendees", matchHandler.SyncAttendees)
+				admin.Post("/api/v1/matches/{id}/attendees/late", matchHandler.AddLateArrival)
+				admin.Delete("/api/v1/matches/{id}/attendees/{playerId}", matchHandler.RemoveAttendee)
+			}
+			if teamHandler != nil {
+				admin.Post("/api/v1/matches/{id}/generate-teams", teamHandler.GenerateTeams)
+				admin.Post("/api/v1/matches/{id}/assignments/swap", teamHandler.SwapPlayers)
+				admin.Post("/api/v1/matches/{id}/assignments/move", teamHandler.MovePlayer)
+				admin.Post("/api/v1/matches/{id}/finalise", teamHandler.FinaliseMatch)
+			}
+		})
 	})
 
 	server := &http.Server{

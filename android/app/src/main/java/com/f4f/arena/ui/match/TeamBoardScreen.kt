@@ -39,6 +39,7 @@ import com.f4f.arena.util.WhatsAppFormatter
 @Composable
 fun TeamBoardScreen(
     matchId: String,
+    isAdmin: Boolean = true,
     onBack: () -> Unit,
     viewModel: TeamBoardViewModel = viewModel()
 ) {
@@ -77,9 +78,9 @@ fun TeamBoardScreen(
                         }) {
                             Icon(Icons.Default.Share, contentDescription = "Export to WhatsApp", tint = MaterialTheme.colorScheme.onPrimary)
                         }
-                        if (successState.data.status != MatchStatus.FINALISED) {
+                        if (isAdmin && successState.data.status != MatchStatus.FINALISED) {
                             IconButton(onClick = { viewModel.generateTeams(matchId) }) {
-                                Icon(Icons.Default.Refresh, contentDescription = "Regenerate", tint = MaterialTheme.colorScheme.onPrimary)
+                                Icon(Icons.Default.Refresh, contentDescription = "Reshuffle Teams", tint = MaterialTheme.colorScheme.onPrimary)
                             }
                             IconButton(onClick = { showFinaliseDialog = true }) {
                                 Icon(Icons.Default.Lock, contentDescription = "Finalise Teams", tint = MaterialTheme.colorScheme.onPrimary)
@@ -224,7 +225,7 @@ fun TeamBoardScreen(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
 
-                                    if (!isFinalised) {
+                                    if (isAdmin && !isFinalised) {
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -243,6 +244,15 @@ fun TeamBoardScreen(
                                             ) {
                                                 Text("Distribute All", fontSize = 12.sp)
                                             }
+                                        }
+                                        Button(
+                                            onClick = { viewModel.generateTeams(matchId) },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            enabled = !state.isGenerating
+                                        ) {
+                                            Icon(Icons.Default.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(if (state.isGenerating) "Reshuffling..." else "Reshuffle / Generate Again")
                                         }
                                     }
                                 }
@@ -284,7 +294,7 @@ fun TeamBoardScreen(
                             InteractiveTeamCard(
                                 team = team,
                                 selectedPlayerId = state.selectedPlayerForSwap?.id,
-                                isFinalised = isFinalised,
+                                isFinalised = isFinalised || !isAdmin,
                                 onPlayerClick = { p -> viewModel.onPlayerClicked(p) },
                                 onPlayerMoveClick = { p -> movingPlayer = p }
                             )
@@ -296,7 +306,7 @@ fun TeamBoardScreen(
                                 InteractiveSubstitutesCard(
                                     substitutes = data.substitutes,
                                     selectedPlayerId = state.selectedPlayerForSwap?.id,
-                                    isFinalised = isFinalised,
+                                    isFinalised = isFinalised || !isAdmin,
                                     onPlayerClick = { p -> viewModel.onPlayerClicked(p) },
                                     onPlayerMoveClick = { p -> movingPlayer = p }
                                 )
@@ -306,7 +316,7 @@ fun TeamBoardScreen(
                         // Bottom Actions: Finalise & WhatsApp Export
                         item {
                             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                if (!isFinalised) {
+                                if (isAdmin && !isFinalised) {
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Button(
                                         onClick = { showFinaliseDialog = true },
@@ -755,5 +765,21 @@ fun InteractiveSubstitutesCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun PositionPillMini(label: String, count: Int, color: Color) {
+    Surface(
+        color = color.copy(alpha = 0.15f),
+        shape = RoundedCornerShape(6.dp)
+    ) {
+        Text(
+            text = "$count $label",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = color,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+        )
     }
 }

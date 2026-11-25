@@ -1,6 +1,7 @@
 package com.f4f.arena.ui.roster
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -30,10 +31,12 @@ import com.f4f.arena.data.model.Position
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RosterScreen(
+    isAdmin: Boolean = true,
     viewModel: RosterViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
+    var editingPlayer by remember { mutableStateOf<Player?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     val actionMessage = (uiState as? RosterUiState.Success)?.actionMessage
@@ -65,12 +68,14 @@ fun RosterScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Player")
+            if (isAdmin) {
+                FloatingActionButton(
+                    onClick = { showAddDialog = true },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Add Player")
+                }
             }
         }
     ) { paddingValues ->
@@ -181,6 +186,8 @@ fun RosterScreen(
                                 items(state.filteredPlayers, key = { it.id }) { player ->
                                     PlayerCard(
                                         player = player,
+                                        isAdmin = isAdmin,
+                                        onClick = { if (isAdmin) editingPlayer = player },
                                         onToggleActive = { viewModel.togglePlayerActive(player) }
                                     )
                                 }
@@ -199,6 +206,22 @@ fun RosterScreen(
                     }
                 )
             }
+
+            if (editingPlayer != null) {
+                val target = editingPlayer!!
+                AddPlayerDialog(
+                    initialName = target.displayName,
+                    initialPosition = target.primaryPosition,
+                    initialNotes = target.notes ?: "",
+                    dialogTitle = "Assign Position / Edit Player",
+                    confirmLabel = "Save",
+                    onDismiss = { editingPlayer = null },
+                    onConfirm = { name, position, notes ->
+                        viewModel.updatePlayerDetails(target.id, name, position, notes)
+                        editingPlayer = null
+                    }
+                )
+            }
         }
     }
 }
@@ -206,10 +229,14 @@ fun RosterScreen(
 @Composable
 fun PlayerCard(
     player: Player,
+    isAdmin: Boolean = true,
+    onClick: () -> Unit = {},
     onToggleActive: () -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (isAdmin) Modifier.clickable { onClick() } else Modifier),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (player.isActive) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
@@ -268,10 +295,12 @@ fun PlayerCard(
                 }
             }
 
-            Switch(
-                checked = player.isActive,
-                onCheckedChange = { onToggleActive() }
-            )
+            if (isAdmin) {
+                Switch(
+                    checked = player.isActive,
+                    onCheckedChange = { onToggleActive() }
+                )
+            }
         }
     }
 }
@@ -279,17 +308,22 @@ fun PlayerCard(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddPlayerDialog(
+    initialName: String = "",
+    initialPosition: Position = Position.MIDFIELDER,
+    initialNotes: String = "",
+    dialogTitle: String = "Add Player to Roster",
+    confirmLabel: String = "Add Player",
     onDismiss: () -> Unit,
     onConfirm: (String, Position, String?) -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var selectedPosition by remember { mutableStateOf(Position.MIDFIELDER) }
-    var notes by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf(initialName) }
+    var selectedPosition by remember { mutableStateOf(initialPosition) }
+    var notes by remember { mutableStateOf(initialNotes) }
     var nameError by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add Player to Roster", fontWeight = FontWeight.Bold) },
+        title = { Text(dialogTitle, fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
@@ -338,7 +372,7 @@ fun AddPlayerDialog(
                     }
                 }
             ) {
-                Text("Add Player")
+                Text(confirmLabel)
             }
         },
         dismissButton = {

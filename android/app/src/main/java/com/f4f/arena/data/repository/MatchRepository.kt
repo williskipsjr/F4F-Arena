@@ -26,14 +26,67 @@ class MatchRepository(
             }
         }
 
-    suspend fun listMatches(status: String? = null): Result<List<Match>> =
+    suspend fun listMatches(status: String? = null, token: String? = null): Result<List<Match>> =
         withContext(Dispatchers.IO) {
             try {
-                val response = matchApi.listMatches(status)
+                val bearer = token?.takeIf { it.isNotBlank() }?.let {
+                    if (it.startsWith("Bearer ")) it else "Bearer $it"
+                }
+                val response = matchApi.listMatches(bearer, status)
                 if (response.isSuccessful && response.body() != null) {
                     Result.success(response.body()!!.data)
                 } else {
                     Result.failure(Exception("Failed to list matches: HTTP ${response.code()}"))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    suspend fun updateMatch(token: String, id: String, request: UpdateMatchRequest): Result<Match> =
+        withContext(Dispatchers.IO) {
+            try {
+                val bearer = if (token.startsWith("Bearer ")) token else "Bearer $token"
+                val response = matchApi.updateMatch(bearer, id, request)
+                if (response.isSuccessful && response.body() != null) {
+                    Result.success(response.body()!!.data)
+                } else if (response.code() == 401) {
+                    com.f4f.arena.data.auth.SessionManager.onUnauthorized()
+                    Result.failure(Exception("Admin sign-in required (HTTP 401)"))
+                } else {
+                    Result.failure(Exception("Failed to update match: HTTP ${response.code()}"))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    suspend fun castVote(token: String, matchId: String, vote: String): Result<Match> =
+        withContext(Dispatchers.IO) {
+            try {
+                val bearer = if (token.startsWith("Bearer ")) token else "Bearer $token"
+                val response = matchApi.castVote(bearer, matchId, CastVoteRequest(vote))
+                if (response.isSuccessful && response.body() != null) {
+                    Result.success(response.body()!!.data)
+                } else if (response.code() == 401) {
+                    com.f4f.arena.data.auth.SessionManager.onUnauthorized()
+                    Result.failure(Exception("Please sign in to vote (HTTP 401)"))
+                } else {
+                    Result.failure(Exception("Failed to record vote: HTTP ${response.code()}"))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    suspend fun getMatchVotes(matchId: String): Result<List<MatchVoteDetail>> =
+        withContext(Dispatchers.IO) {
+            try {
+                val response = matchApi.getMatchVotes(matchId)
+                if (response.isSuccessful && response.body() != null) {
+                    Result.success(response.body()!!.data)
+                } else {
+                    Result.failure(Exception("Failed to load votes: HTTP ${response.code()}"))
                 }
             } catch (e: Exception) {
                 Result.failure(e)

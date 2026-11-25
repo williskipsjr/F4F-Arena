@@ -75,6 +75,7 @@ func (s *teamService) GenerateTeams(ctx context.Context, matchID string, subPoli
 		Format:    match.Format,
 		SubPolicy: subPolicy,
 		Attendees: players,
+		Shuffle:   true,
 	}
 
 	result, err := s.engine.Generate(req)
@@ -93,7 +94,7 @@ func (s *teamService) GenerateTeams(ctx context.Context, matchID string, subPoli
 
 	// Merge any engine algorithmic warnings (e.g. shortages/surpluses)
 	warningSet := make(map[string]bool)
-	var combinedWarnings []string
+	combinedWarnings := make([]string, 0)
 	for _, w := range resp.Warnings {
 		if !warningSet[w] {
 			warningSet[w] = true

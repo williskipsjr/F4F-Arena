@@ -17,6 +17,7 @@ type MatchmakingRequest struct {
 	Format    domain.MatchFormat
 	SubPolicy domain.SubstitutePolicy
 	Attendees []domain.Player
+	Shuffle   bool
 }
 
 type AssignedPlayer struct {

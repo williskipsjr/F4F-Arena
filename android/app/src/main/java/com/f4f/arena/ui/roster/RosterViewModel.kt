@@ -132,4 +132,29 @@ class RosterViewModel(
             }
         }
     }
+
+    fun updatePlayerDetails(
+        playerId: String,
+        name: String,
+        position: Position,
+        notes: String?,
+        token: String = com.f4f.arena.data.auth.SessionManager.getBearerToken()
+    ) {
+        viewModelScope.launch {
+            repository.updatePlayer(
+                token,
+                playerId,
+                UpdatePlayerRequest(
+                    displayName = name,
+                    primaryPosition = position.name,
+                    notes = notes
+                )
+            ).onSuccess { updated ->
+                rawPlayers = rawPlayers.map { if (it.id == updated.id) updated else it }
+                applyFilterAndSearch(actionMessage = "${updated.displayName} updated (${updated.primaryPosition.shortLabel})")
+            }.onFailure { err ->
+                applyFilterAndSearch(actionMessage = err.localizedMessage ?: "Failed to update player")
+            }
+        }
+    }
 }
