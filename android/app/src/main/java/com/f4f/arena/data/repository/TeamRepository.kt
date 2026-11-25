@@ -95,4 +95,18 @@ class TeamRepository(
                 Result.failure(e)
             }
         }
+
+    suspend fun getWhatsAppExport(matchId: String): Result<String> =
+        withContext(Dispatchers.IO) {
+            try {
+                val response = teamApi.getWhatsAppExport(matchId)
+                if (response.isSuccessful && response.body() != null) {
+                    Result.success(response.body()!!.data.formattedText)
+                } else {
+                    Result.failure(Exception("Failed to fetch WhatsApp export: HTTP ${response.code()}"))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
 }

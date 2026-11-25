@@ -14,11 +14,12 @@ import (
 )
 
 type mockTeamService struct {
-	generateFn func(ctx context.Context, matchID string, subPolicyOverride *domain.SubstitutePolicy) (*domain.MatchTeamsResponse, error)
-	getFn      func(ctx context.Context, matchID string) (*domain.MatchTeamsResponse, error)
-	swapFn     func(ctx context.Context, matchID string, input domain.SwapPlayersInput) (*domain.MatchTeamsResponse, error)
-	moveFn     func(ctx context.Context, matchID string, input domain.MovePlayerInput) (*domain.MatchTeamsResponse, error)
-	finaliseFn func(ctx context.Context, matchID string) (*domain.MatchTeamsResponse, error)
+	generateFn       func(ctx context.Context, matchID string, subPolicyOverride *domain.SubstitutePolicy) (*domain.MatchTeamsResponse, error)
+	getFn            func(ctx context.Context, matchID string) (*domain.MatchTeamsResponse, error)
+	swapFn           func(ctx context.Context, matchID string, input domain.SwapPlayersInput) (*domain.MatchTeamsResponse, error)
+	moveFn           func(ctx context.Context, matchID string, input domain.MovePlayerInput) (*domain.MatchTeamsResponse, error)
+	finaliseFn       func(ctx context.Context, matchID string) (*domain.MatchTeamsResponse, error)
+	whatsappExportFn func(ctx context.Context, matchID string) (*domain.WhatsAppExportResponse, error)
 }
 
 func (m *mockTeamService) GenerateTeams(ctx context.Context, matchID string, subPolicyOverride *domain.SubstitutePolicy) (*domain.MatchTeamsResponse, error) {
@@ -52,6 +53,13 @@ func (m *mockTeamService) MovePlayer(ctx context.Context, matchID string, input 
 func (m *mockTeamService) FinaliseMatch(ctx context.Context, matchID string) (*domain.MatchTeamsResponse, error) {
 	if m.finaliseFn != nil {
 		return m.finaliseFn(ctx, matchID)
+	}
+	return nil, domain.ErrMatchNotFound
+}
+
+func (m *mockTeamService) GetWhatsAppExport(ctx context.Context, matchID string) (*domain.WhatsAppExportResponse, error) {
+	if m.whatsappExportFn != nil {
+		return m.whatsappExportFn(ctx, matchID)
 	}
 	return nil, domain.ErrMatchNotFound
 }
@@ -260,6 +268,30 @@ func TestTeamHandler_FinaliseMatch_Success(t *testing.T) {
 	r.Post("/api/v1/matches/{id}/finalise", h.FinaliseMatch)
 
 	req := httptest.NewRequest("POST", "/api/v1/matches/match-123/finalise", nil)
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestTeamHandler_GetWhatsAppExport_Success(t *testing.T) {
+	svc := &mockTeamService{
+		whatsappExportFn: func(ctx context.Context, matchID string) (*domain.WhatsAppExportResponse, error) {
+			return &domain.WhatsAppExportResponse{
+				MatchID:       matchID,
+				FormattedText: "⚽ *F4F ARENA*",
+			}, nil
+		},
+	}
+	h := NewTeamHandler(svc)
+
+	r := chi.NewRouter()
+	r.Get("/api/v1/matches/{id}/whatsapp-export", h.GetWhatsAppExport)
+
+	req := httptest.NewRequest("GET", "/api/v1/matches/match-123/whatsapp-export", nil)
 	w := httptest.NewRecorder()
 
 	r.ServeHTTP(w, req)

@@ -101,6 +101,7 @@ func main() {
 	}
 	if teamHandler != nil {
 		r.Get("/api/v1/matches/{id}/teams", teamHandler.GetTeams)
+		r.Get("/api/v1/matches/{id}/whatsapp-export", teamHandler.GetWhatsAppExport)
 	}
 
 	// Protected Routes (Admin mutations)

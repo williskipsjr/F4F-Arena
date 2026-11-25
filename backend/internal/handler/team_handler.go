@@ -176,3 +176,25 @@ func (h *TeamHandler) FinaliseMatch(w http.ResponseWriter, r *http.Request) {
 		"data": resp,
 	})
 }
+
+func (h *TeamHandler) GetWhatsAppExport(w http.ResponseWriter, r *http.Request) {
+	matchID := chi.URLParam(r, "id")
+	if matchID == "" {
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "Match ID is required")
+		return
+	}
+
+	resp, err := h.teamService.GetWhatsAppExport(r.Context(), matchID)
+	if err != nil {
+		if errors.Is(err, domain.ErrMatchNotFound) {
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "Match not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"data": resp,
+	})
+}
