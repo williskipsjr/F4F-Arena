@@ -4,6 +4,7 @@ import com.f4f.arena.data.model.GenerateTeamsRequest
 import com.f4f.arena.data.model.MatchTeamsResponse
 import com.f4f.arena.data.model.MovePlayerRequest
 import com.f4f.arena.data.model.SwapPlayersRequest
+import com.f4f.arena.data.model.WhatsAppExportResponse
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -44,4 +45,9 @@ interface TeamApi {
         @Header("Authorization") bearerToken: String,
         @Path("id") matchId: String
     ): Response<MatchTeamsResponse>
+
+    @GET("api/v1/matches/{id}/whatsapp-export")
+    suspend fun getWhatsAppExport(
+        @Path("id") matchId: String
+    ): Response<WhatsAppExportResponse>
 }

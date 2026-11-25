@@ -77,3 +77,8 @@ type MovePlayerInput struct {
 	IsSubstitute     bool      `json:"is_substitute"`
 	AssignedPosition *Position `json:"assigned_position,omitempty"`
 }
+
+type WhatsAppExportResponse struct {
+	MatchID       string `json:"match_id"`
+	FormattedText string `json:"formatted_text"`
+}

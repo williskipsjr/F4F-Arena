@@ -1,13 +1,16 @@
 package com.f4f.arena.ui.match
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -16,6 +19,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -26,6 +33,7 @@ import com.f4f.arena.data.model.SubstitutePolicy
 import com.f4f.arena.data.model.TeamDetail
 import com.f4f.arena.data.model.TeamPlayerDetail
 import com.f4f.arena.ui.roster.positionColor
+import com.f4f.arena.util.WhatsAppFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,7 +44,12 @@ fun TeamBoardScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showFinaliseDialog by remember { mutableStateOf(false) }
+    var showWhatsAppDialog by remember { mutableStateOf(false) }
+    var copiedToClipboard by remember { mutableStateOf(false) }
     var movingPlayer by remember { mutableStateOf<TeamPlayerDetail?>(null) }
+
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
 
     LaunchedEffect(matchId) {
         viewModel.loadOrGenerateTeams(matchId)
@@ -57,12 +70,20 @@ fun TeamBoardScreen(
                 ),
                 actions = {
                     val successState = uiState as? TeamBoardUiState.Success
-                    if (successState != null && successState.data.status != MatchStatus.FINALISED) {
-                        IconButton(onClick = { viewModel.generateTeams(matchId) }) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Regenerate", tint = MaterialTheme.colorScheme.onPrimary)
+                    if (successState != null) {
+                        IconButton(onClick = {
+                            copiedToClipboard = false
+                            showWhatsAppDialog = true
+                        }) {
+                            Icon(Icons.Default.Share, contentDescription = "Export to WhatsApp", tint = MaterialTheme.colorScheme.onPrimary)
                         }
-                        IconButton(onClick = { showFinaliseDialog = true }) {
-                            Icon(Icons.Default.Lock, contentDescription = "Finalise Teams", tint = MaterialTheme.colorScheme.onPrimary)
+                        if (successState.data.status != MatchStatus.FINALISED) {
+                            IconButton(onClick = { viewModel.generateTeams(matchId) }) {
+                                Icon(Icons.Default.Refresh, contentDescription = "Regenerate", tint = MaterialTheme.colorScheme.onPrimary)
+                            }
+                            IconButton(onClick = { showFinaliseDialog = true }) {
+                                Icon(Icons.Default.Lock, contentDescription = "Finalise Teams", tint = MaterialTheme.colorScheme.onPrimary)
+                            }
                         }
                     }
                 }
@@ -282,23 +303,109 @@ fun TeamBoardScreen(
                             }
                         }
 
-                        // Bottom Finalise Action Button
-                        if (!isFinalised) {
-                            item {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Button(
-                                    onClick = { showFinaliseDialog = true },
+                        // Bottom Actions: Finalise & WhatsApp Export
+                        item {
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                if (!isFinalised) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Button(
+                                        onClick = { showFinaliseDialog = true },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(50.dp),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Icon(Icons.Default.Lock, contentDescription = null)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Finalise Match Teams 🔒", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    }
+                                }
+
+                                OutlinedButton(
+                                    onClick = {
+                                        copiedToClipboard = false
+                                        showWhatsAppDialog = true
+                                    },
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(50.dp),
                                     shape = RoundedCornerShape(12.dp)
                                 ) {
-                                    Icon(Icons.Default.Lock, contentDescription = null)
+                                    Icon(Icons.Default.Share, contentDescription = null)
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Finalise Match Teams 🔒", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    Text("Export to WhatsApp 📲", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                                 }
                             }
                         }
+                    }
+
+                    // WhatsApp Export Preview Dialog
+                    if (showWhatsAppDialog) {
+                        val formattedText = remember(data) {
+                            WhatsAppFormatter.format(data)
+                        }
+                        AlertDialog(
+                            onDismissRequest = { showWhatsAppDialog = false },
+                            title = { Text("WhatsApp Export Preview", fontWeight = FontWeight.Bold) },
+                            text = {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(max = 320.dp)
+                                    ) {
+                                        Text(
+                                            text = formattedText,
+                                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                            modifier = Modifier
+                                                .padding(12.dp)
+                                                .verticalScroll(rememberScrollState())
+                                        )
+                                    }
+                                    if (copiedToClipboard) {
+                                        Text(
+                                            text = "✅ Copied to clipboard! Ready to paste in WhatsApp.",
+                                            color = Color(0xFF2E7D32),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                Button(
+                                    onClick = {
+                                        clipboardManager.setText(AnnotatedString(formattedText))
+                                        copiedToClipboard = true
+                                    }
+                                ) {
+                                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Copy")
+                                }
+                            },
+                            dismissButton = {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    TextButton(
+                                        onClick = {
+                                            val sendIntent = Intent().apply {
+                                                action = Intent.ACTION_SEND
+                                                putExtra(Intent.EXTRA_TEXT, formattedText)
+                                                type = "text/plain"
+                                            }
+                                            context.startActivity(Intent.createChooser(sendIntent, "Share Teams via"))
+                                        }
+                                    ) {
+                                        Text("Share")
+                                    }
+                                    TextButton(onClick = { showWhatsAppDialog = false }) {
+                                        Text("Close")
+                                    }
+                                }
+                            }
+                        )
                     }
 
                     // Finalise Confirmation Dialog

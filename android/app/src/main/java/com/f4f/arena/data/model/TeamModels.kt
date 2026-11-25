@@ -53,3 +53,12 @@ data class MatchTeamsData(
 data class MatchTeamsResponse(
     @SerializedName("data") val data: MatchTeamsData
 )
+
+data class WhatsAppExportData(
+    @SerializedName("match_id") val matchId: String,
+    @SerializedName("formatted_text") val formattedText: String
+)
+
+data class WhatsAppExportResponse(
+    @SerializedName("data") val data: WhatsAppExportData
+)

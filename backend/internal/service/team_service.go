@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/williskipsjr/f4f-arena/backend/internal/domain"
 	"github.com/williskipsjr/f4f-arena/backend/internal/matchmaker"
@@ -22,6 +23,7 @@ type TeamService interface {
 	SwapPlayers(ctx context.Context, matchID string, input domain.SwapPlayersInput) (*domain.MatchTeamsResponse, error)
 	MovePlayer(ctx context.Context, matchID string, input domain.MovePlayerInput) (*domain.MatchTeamsResponse, error)
 	FinaliseMatch(ctx context.Context, matchID string) (*domain.MatchTeamsResponse, error)
+	GetWhatsAppExport(ctx context.Context, matchID string) (*domain.WhatsAppExportResponse, error)
 }
 
 type teamService struct {
@@ -137,4 +139,116 @@ func (s *teamService) FinaliseMatch(ctx context.Context, matchID string) (*domai
 	}
 
 	return s.teamRepo.GetTeamsByMatchID(ctx, matchID)
+}
+
+func (s *teamService) GetWhatsAppExport(ctx context.Context, matchID string) (*domain.WhatsAppExportResponse, error) {
+	match, err := s.matchRepo.GetByID(ctx, matchID)
+	if err != nil {
+		return nil, err
+	}
+
+	teamsResp, err := s.teamRepo.GetTeamsByMatchID(ctx, matchID)
+	if err != nil {
+		return nil, err
+	}
+
+	formatted := formatWhatsAppMessage(match, teamsResp)
+	return &domain.WhatsAppExportResponse{
+		MatchID:       matchID,
+		FormattedText: formatted,
+	}, nil
+}
+
+func formatWhatsAppMessage(match *domain.Match, teamsResp *domain.MatchTeamsResponse) string {
+	var sb strings.Builder
+
+	sb.WriteString("⚽ *F4F ARENA — MATCH DAY TEAMS*\n")
+	if match.Title != "" {
+		sb.WriteString(fmt.Sprintf("📌 *%s* (%s)\n", match.Title, formatLabel(teamsResp.Format)))
+	}
+	if match.Venue != nil && strings.TrimSpace(*match.Venue) != "" {
+		sb.WriteString(fmt.Sprintf("📍 Venue: %s\n", strings.TrimSpace(*match.Venue)))
+	}
+	sb.WriteString("\n")
+
+	for _, team := range teamsResp.Teams {
+		if team.BibColor != nil && strings.TrimSpace(*team.BibColor) != "" {
+			sb.WriteString(fmt.Sprintf("*%s (%s)*\n", strings.ToUpper(team.TeamName), strings.TrimSpace(*team.BibColor)))
+		} else {
+			sb.WriteString(fmt.Sprintf("*%s*\n", strings.ToUpper(team.TeamName)))
+		}
+
+		var keepers, defenders, midfielders, strikers []string
+		for _, p := range team.Players {
+			name := p.DisplayName
+			if p.IsEmergencyKeeper {
+				name += " (Emergency GK)"
+			}
+			switch p.AssignedPosition {
+			case domain.PositionKeeper:
+				keepers = append(keepers, name)
+			case domain.PositionDefender:
+				defenders = append(defenders, name)
+			case domain.PositionMidfielder:
+				midfielders = append(midfielders, name)
+			case domain.PositionStriker:
+				strikers = append(strikers, name)
+			}
+		}
+
+		if len(keepers) > 0 {
+			sb.WriteString(fmt.Sprintf("🧤 Keeper: %s\n", strings.Join(keepers, ", ")))
+		} else {
+			sb.WriteString("🧤 Keeper: _Needs Emergency GK_\n")
+		}
+		if len(defenders) > 0 {
+			sb.WriteString(fmt.Sprintf("🛡️ Defenders: %s\n", strings.Join(defenders, ", ")))
+		}
+		if len(midfielders) > 0 {
+			sb.WriteString(fmt.Sprintf("⚙️ Midfielders: %s\n", strings.Join(midfielders, ", ")))
+		}
+		if len(strikers) > 0 {
+			sb.WriteString(fmt.Sprintf("⚡ Strikers: %s\n", strings.Join(strikers, ", ")))
+		}
+		sb.WriteString("\n")
+	}
+
+	if len(teamsResp.Substitutes) > 0 {
+		sb.WriteString("*SUBSTITUTES / BENCH*\n")
+		for _, sub := range teamsResp.Substitutes {
+			sb.WriteString(fmt.Sprintf("- %s (%s)\n", sub.DisplayName, posShort(sub.PrimaryPosition)))
+		}
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString("Let's have a great game! ⚽🔥")
+	return sb.String()
+}
+
+func formatLabel(f domain.MatchFormat) string {
+	switch f {
+	case domain.FormatSixASide:
+		return "6-a-side"
+	case domain.FormatSevenASide:
+		return "7-a-side"
+	case domain.FormatNineASide:
+		return "9-a-side"
+	default:
+		return string(f)
+	}
+}
+
+func posShort(p domain.Position) string {
+	switch p {
+	case domain.PositionKeeper:
+		return "GK"
+	case domain.PositionDefender:
+		return "DEF"
+	case domain.PositionMidfielder:
+		return "MID"
+	case domain.PositionStriker:
+		return "STR"
+	default:
+		return string(p)
+	}
 }

@@ -368,3 +368,75 @@ func TestTeamService_FinaliseMatch(t *testing.T) {
 		t.Errorf("expected status FINALISED, got %s", resp.Status)
 	}
 }
+
+func TestTeamService_GetWhatsAppExport(t *testing.T) {
+	venue := "Turf Arena"
+	bib := "Orange"
+	matchStore := &mockMatchStoreForTeam{
+		match: &domain.Match{
+			ID:     "match-1",
+			Title:  "Saturday Morning Kickoff",
+			Venue:  &venue,
+			Format: domain.FormatSevenASide,
+		},
+	}
+	teamStore := &mockTeamStore{
+		response: &domain.MatchTeamsResponse{
+			MatchID: "match-1",
+			Format:  domain.FormatSevenASide,
+			Teams: []domain.TeamDetail{
+				{
+					TeamNumber: 1,
+					TeamName:   "Team 1",
+					BibColor:   &bib,
+					Players: []domain.TeamPlayerDetail{
+						{DisplayName: "Lenpu", AssignedPosition: domain.PositionKeeper},
+						{DisplayName: "Thonglam", AssignedPosition: domain.PositionDefender},
+						{DisplayName: "Eric", AssignedPosition: domain.PositionMidfielder},
+						{DisplayName: "Joseph", AssignedPosition: domain.PositionStriker},
+					},
+				},
+			},
+			Substitutes: []domain.TeamPlayerDetail{
+				{DisplayName: "Jack", PrimaryPosition: domain.PositionMidfielder},
+			},
+		},
+	}
+	svc := NewTeamService(matchStore, teamStore)
+
+	export, err := svc.GetWhatsAppExport(context.Background(), "match-1")
+	if err != nil {
+		t.Fatalf("unexpected export error: %v", err)
+	}
+
+	checks := []string{
+		"F4F ARENA",
+		"Saturday Morning Kickoff",
+		"Turf Arena",
+		"*TEAM 1 (Orange)*",
+		"🧤 Keeper: Lenpu",
+		"🛡️ Defenders: Thonglam",
+		"⚙️ Midfielders: Eric",
+		"⚡ Strikers: Joseph",
+		"*SUBSTITUTES / BENCH*",
+		"- Jack (MID)",
+	}
+	for _, c := range checks {
+		if !containsStr(export.FormattedText, c) {
+			t.Errorf("expected exported text to contain %q, got:\n%s", c, export.FormattedText)
+		}
+	}
+}
+
+func containsStr(haystack, needle string) bool {
+	return len(needle) == 0 || (len(haystack) >= len(needle) && indexStr(haystack, needle) >= 0)
+}
+
+func indexStr(s, substr string) int {
+	for i := 0; i+len(substr) <= len(s); i++ {
+		if s[i:i+len(substr)] == substr {
+			return i
+		}
+	}
+	return -1
+}
