@@ -52,7 +52,7 @@ class MatchViewModel(
         title: String,
         format: MatchFormat,
         venue: String?,
-        token: String = "dev-token",
+        token: String = com.f4f.arena.data.auth.SessionManager.getBearerToken(),
         onSuccess: (Match) -> Unit
     ) {
         viewModelScope.launch {

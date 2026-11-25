@@ -34,7 +34,7 @@ class TeamBoardViewModel(
 
     private var currentMatchId: String? = null
 
-    fun loadOrGenerateTeams(matchId: String, token: String = "dev-token") {
+    fun loadOrGenerateTeams(matchId: String, token: String = com.f4f.arena.data.auth.SessionManager.getBearerToken()) {
         currentMatchId = matchId
         viewModelScope.launch {
             _uiState.value = TeamBoardUiState.Loading
@@ -50,7 +50,7 @@ class TeamBoardViewModel(
     fun generateTeams(
         matchId: String,
         subPolicy: SubstitutePolicy? = null,
-        token: String = "dev-token"
+        token: String = com.f4f.arena.data.auth.SessionManager.getBearerToken()
     ) {
         viewModelScope.launch {
             val prevSuccess = (_uiState.value as? TeamBoardUiState.Success)
@@ -81,7 +81,7 @@ class TeamBoardViewModel(
         }
     }
 
-    fun onPlayerClicked(player: TeamPlayerDetail, token: String = "dev-token") {
+    fun onPlayerClicked(player: TeamPlayerDetail, token: String = com.f4f.arena.data.auth.SessionManager.getBearerToken()) {
         val state = (_uiState.value as? TeamBoardUiState.Success) ?: return
         val matchId = currentMatchId ?: return
 
@@ -142,7 +142,7 @@ class TeamBoardViewModel(
         playerId: String,
         targetTeamId: String?,
         isSubstitute: Boolean,
-        token: String = "dev-token"
+        token: String = com.f4f.arena.data.auth.SessionManager.getBearerToken()
     ) {
         val matchId = currentMatchId ?: return
         viewModelScope.launch {
@@ -166,7 +166,7 @@ class TeamBoardViewModel(
         }
     }
 
-    fun finaliseMatch(token: String = "dev-token") {
+    fun finaliseMatch(token: String = com.f4f.arena.data.auth.SessionManager.getBearerToken()) {
         val matchId = currentMatchId ?: return
         viewModelScope.launch {
             val state = (_uiState.value as? TeamBoardUiState.Success) ?: return@launch

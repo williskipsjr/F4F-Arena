@@ -143,7 +143,7 @@ class AttendanceViewModel(
         )
     }
 
-    fun saveAttendance(token: String = "dev-token", onSaved: (() -> Unit)? = null) {
+    fun saveAttendance(token: String = com.f4f.arena.data.auth.SessionManager.getBearerToken(), onSaved: (() -> Unit)? = null) {
         val match = currentMatch ?: return
         viewModelScope.launch {
             updateCalculatedState(isSaving = true)
@@ -158,7 +158,7 @@ class AttendanceViewModel(
         }
     }
 
-    fun quickAddGuest(name: String, position: Position, token: String = "dev-token") {
+    fun quickAddGuest(name: String, position: Position, token: String = com.f4f.arena.data.auth.SessionManager.getBearerToken()) {
         viewModelScope.launch {
             playerRepository.createPlayer(
                 token,
