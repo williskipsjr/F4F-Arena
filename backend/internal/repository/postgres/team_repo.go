@@ -133,7 +133,7 @@ func (r *TeamRepository) GetTeamsByMatchID(ctx context.Context, matchID string) 
 	defer rows.Close()
 
 	teamMap := make(map[string]*domain.TeamDetail)
-	var teams []domain.TeamDetail
+	teams := make([]domain.TeamDetail, 0)
 
 	for rows.Next() {
 		var td domain.TeamDetail
@@ -173,7 +173,7 @@ func (r *TeamRepository) GetTeamsByMatchID(ctx context.Context, matchID string) 
 	}
 	defer assignRows.Close()
 
-	var substitutes []domain.TeamPlayerDetail
+	substitutes := make([]domain.TeamPlayerDetail, 0)
 	assignedCount := 0
 
 	for assignRows.Next() {
@@ -219,7 +219,7 @@ func (r *TeamRepository) GetTeamsByMatchID(ctx context.Context, matchID string) 
 	}
 
 	// 4. Generate warnings if any team is missing goalkeeper
-	var warnings []string
+	warnings := make([]string, 0)
 	for _, t := range teams {
 		if t.PositionCounts[domain.PositionKeeper] == 0 {
 			warnings = append(warnings, fmt.Sprintf("%s has no goalkeeper (Needs Emergency GK)", t.TeamName))
