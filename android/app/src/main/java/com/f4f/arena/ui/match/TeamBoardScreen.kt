@@ -757,3 +757,19 @@ fun InteractiveSubstitutesCard(
         }
     }
 }
+
+@Composable
+fun PositionPillMini(label: String, count: Int, color: Color) {
+    Surface(
+        color = color.copy(alpha = 0.15f),
+        shape = RoundedCornerShape(6.dp)
+    ) {
+        Text(
+            text = "$count $label",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = color,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+        )
+    }
+}
