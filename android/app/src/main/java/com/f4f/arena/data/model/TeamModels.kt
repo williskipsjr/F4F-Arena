@@ -6,6 +6,18 @@ data class GenerateTeamsRequest(
     @SerializedName("sub_policy") val subPolicy: String? = null
 )
 
+data class SwapPlayersRequest(
+    @SerializedName("player_a_id") val playerAId: String,
+    @SerializedName("player_b_id") val playerBId: String
+)
+
+data class MovePlayerRequest(
+    @SerializedName("player_id") val playerId: String,
+    @SerializedName("target_team_id") val targetTeamId: String? = null,
+    @SerializedName("is_substitute") val isSubstitute: Boolean = false,
+    @SerializedName("assigned_position") val assignedPosition: String? = null
+)
+
 data class TeamPlayerDetail(
     @SerializedName("id") val id: String,
     @SerializedName("display_name") val displayName: String,

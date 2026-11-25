@@ -16,6 +16,9 @@ import (
 type mockTeamService struct {
 	generateFn func(ctx context.Context, matchID string, subPolicyOverride *domain.SubstitutePolicy) (*domain.MatchTeamsResponse, error)
 	getFn      func(ctx context.Context, matchID string) (*domain.MatchTeamsResponse, error)
+	swapFn     func(ctx context.Context, matchID string, input domain.SwapPlayersInput) (*domain.MatchTeamsResponse, error)
+	moveFn     func(ctx context.Context, matchID string, input domain.MovePlayerInput) (*domain.MatchTeamsResponse, error)
+	finaliseFn func(ctx context.Context, matchID string) (*domain.MatchTeamsResponse, error)
 }
 
 func (m *mockTeamService) GenerateTeams(ctx context.Context, matchID string, subPolicyOverride *domain.SubstitutePolicy) (*domain.MatchTeamsResponse, error) {
@@ -28,6 +31,27 @@ func (m *mockTeamService) GenerateTeams(ctx context.Context, matchID string, sub
 func (m *mockTeamService) GetTeams(ctx context.Context, matchID string) (*domain.MatchTeamsResponse, error) {
 	if m.getFn != nil {
 		return m.getFn(ctx, matchID)
+	}
+	return nil, domain.ErrMatchNotFound
+}
+
+func (m *mockTeamService) SwapPlayers(ctx context.Context, matchID string, input domain.SwapPlayersInput) (*domain.MatchTeamsResponse, error) {
+	if m.swapFn != nil {
+		return m.swapFn(ctx, matchID, input)
+	}
+	return nil, domain.ErrMatchNotFound
+}
+
+func (m *mockTeamService) MovePlayer(ctx context.Context, matchID string, input domain.MovePlayerInput) (*domain.MatchTeamsResponse, error) {
+	if m.moveFn != nil {
+		return m.moveFn(ctx, matchID, input)
+	}
+	return nil, domain.ErrMatchNotFound
+}
+
+func (m *mockTeamService) FinaliseMatch(ctx context.Context, matchID string) (*domain.MatchTeamsResponse, error) {
+	if m.finaliseFn != nil {
+		return m.finaliseFn(ctx, matchID)
 	}
 	return nil, domain.ErrMatchNotFound
 }
@@ -126,6 +150,116 @@ func TestTeamHandler_GetTeams_Success(t *testing.T) {
 	r.Get("/api/v1/matches/{id}/teams", h.GetTeams)
 
 	req := httptest.NewRequest("GET", "/api/v1/matches/match-123/teams", nil)
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestTeamHandler_SwapPlayers_Success(t *testing.T) {
+	svc := &mockTeamService{
+		swapFn: func(ctx context.Context, matchID string, input domain.SwapPlayersInput) (*domain.MatchTeamsResponse, error) {
+			return &domain.MatchTeamsResponse{
+				MatchID:   matchID,
+				TeamCount: 2,
+			}, nil
+		},
+	}
+	h := NewTeamHandler(svc)
+
+	r := chi.NewRouter()
+	r.Post("/api/v1/matches/{id}/assignments/swap", h.SwapPlayers)
+
+	body, _ := json.Marshal(domain.SwapPlayersInput{
+		PlayerAID: "p-1",
+		PlayerBID: "p-2",
+	})
+	req := httptest.NewRequest("POST", "/api/v1/matches/match-123/assignments/swap", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestTeamHandler_SwapPlayers_CannotSwapSelf(t *testing.T) {
+	svc := &mockTeamService{
+		swapFn: func(ctx context.Context, matchID string, input domain.SwapPlayersInput) (*domain.MatchTeamsResponse, error) {
+			return nil, domain.ErrCannotSwapSelf
+		},
+	}
+	h := NewTeamHandler(svc)
+
+	r := chi.NewRouter()
+	r.Post("/api/v1/matches/{id}/assignments/swap", h.SwapPlayers)
+
+	body, _ := json.Marshal(domain.SwapPlayersInput{
+		PlayerAID: "p-1",
+		PlayerBID: "p-1",
+	})
+	req := httptest.NewRequest("POST", "/api/v1/matches/match-123/assignments/swap", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestTeamHandler_MovePlayer_Success(t *testing.T) {
+	svc := &mockTeamService{
+		moveFn: func(ctx context.Context, matchID string, input domain.MovePlayerInput) (*domain.MatchTeamsResponse, error) {
+			return &domain.MatchTeamsResponse{
+				MatchID:   matchID,
+				TeamCount: 2,
+			}, nil
+		},
+	}
+	h := NewTeamHandler(svc)
+
+	r := chi.NewRouter()
+	r.Post("/api/v1/matches/{id}/assignments/move", h.MovePlayer)
+
+	targetTeam := "team-1"
+	body, _ := json.Marshal(domain.MovePlayerInput{
+		PlayerID:     "p-1",
+		TargetTeamID: &targetTeam,
+		IsSubstitute: false,
+	})
+	req := httptest.NewRequest("POST", "/api/v1/matches/match-123/assignments/move", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestTeamHandler_FinaliseMatch_Success(t *testing.T) {
+	svc := &mockTeamService{
+		finaliseFn: func(ctx context.Context, matchID string) (*domain.MatchTeamsResponse, error) {
+			return &domain.MatchTeamsResponse{
+				MatchID: matchID,
+				Status:  domain.StatusFinalised,
+			}, nil
+		},
+	}
+	h := NewTeamHandler(svc)
+
+	r := chi.NewRouter()
+	r.Post("/api/v1/matches/{id}/finalise", h.FinaliseMatch)
+
+	req := httptest.NewRequest("POST", "/api/v1/matches/match-123/finalise", nil)
 	w := httptest.NewRecorder()
 
 	r.ServeHTTP(w, req)

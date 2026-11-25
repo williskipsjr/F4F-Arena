@@ -1,7 +1,16 @@
 package domain
 
 import (
+	"errors"
 	"time"
+)
+
+var (
+	ErrAssignmentNotFound = errors.New("player assignment not found for this match")
+	ErrMatchCompleted     = errors.New("cannot edit a completed or cancelled match")
+	ErrTargetTeamNotFound = errors.New("target team does not exist for this match")
+	ErrPlayerNotAttendee  = errors.New("player is not an attendee in this match")
+	ErrCannotSwapSelf     = errors.New("cannot swap a player with themselves")
 )
 
 type Team struct {
@@ -55,4 +64,16 @@ type MatchTeamsResponse struct {
 	TotalAttendees   int                `json:"total_attendees"`
 	AssignedCount    int                `json:"assigned_count"`
 	SubstitutesCount int                `json:"substitutes_count"`
+}
+
+type SwapPlayersInput struct {
+	PlayerAID string `json:"player_a_id"`
+	PlayerBID string `json:"player_b_id"`
+}
+
+type MovePlayerInput struct {
+	PlayerID         string    `json:"player_id"`
+	TargetTeamID     *string   `json:"target_team_id,omitempty"`
+	IsSubstitute     bool      `json:"is_substitute"`
+	AssignedPosition *Position `json:"assigned_position,omitempty"`
 }

@@ -11,11 +11,17 @@ import (
 type TeamStore interface {
 	SaveGeneratedTeams(ctx context.Context, matchID string, result *matchmaker.MatchmakingResult) error
 	GetTeamsByMatchID(ctx context.Context, matchID string) (*domain.MatchTeamsResponse, error)
+	SwapPlayers(ctx context.Context, matchID, playerAID, playerBID string) error
+	MovePlayer(ctx context.Context, matchID string, input domain.MovePlayerInput) error
+	FinaliseMatch(ctx context.Context, matchID string) error
 }
 
 type TeamService interface {
 	GenerateTeams(ctx context.Context, matchID string, subPolicyOverride *domain.SubstitutePolicy) (*domain.MatchTeamsResponse, error)
 	GetTeams(ctx context.Context, matchID string) (*domain.MatchTeamsResponse, error)
+	SwapPlayers(ctx context.Context, matchID string, input domain.SwapPlayersInput) (*domain.MatchTeamsResponse, error)
+	MovePlayer(ctx context.Context, matchID string, input domain.MovePlayerInput) (*domain.MatchTeamsResponse, error)
+	FinaliseMatch(ctx context.Context, matchID string) (*domain.MatchTeamsResponse, error)
 }
 
 type teamService struct {
@@ -98,5 +104,37 @@ func (s *teamService) GenerateTeams(ctx context.Context, matchID string, subPoli
 }
 
 func (s *teamService) GetTeams(ctx context.Context, matchID string) (*domain.MatchTeamsResponse, error) {
+	return s.teamRepo.GetTeamsByMatchID(ctx, matchID)
+}
+
+func (s *teamService) SwapPlayers(ctx context.Context, matchID string, input domain.SwapPlayersInput) (*domain.MatchTeamsResponse, error) {
+	if input.PlayerAID == "" || input.PlayerBID == "" {
+		return nil, fmt.Errorf("both player_a_id and player_b_id are required")
+	}
+
+	if err := s.teamRepo.SwapPlayers(ctx, matchID, input.PlayerAID, input.PlayerBID); err != nil {
+		return nil, err
+	}
+
+	return s.teamRepo.GetTeamsByMatchID(ctx, matchID)
+}
+
+func (s *teamService) MovePlayer(ctx context.Context, matchID string, input domain.MovePlayerInput) (*domain.MatchTeamsResponse, error) {
+	if input.PlayerID == "" {
+		return nil, fmt.Errorf("player_id is required")
+	}
+
+	if err := s.teamRepo.MovePlayer(ctx, matchID, input); err != nil {
+		return nil, err
+	}
+
+	return s.teamRepo.GetTeamsByMatchID(ctx, matchID)
+}
+
+func (s *teamService) FinaliseMatch(ctx context.Context, matchID string) (*domain.MatchTeamsResponse, error) {
+	if err := s.teamRepo.FinaliseMatch(ctx, matchID); err != nil {
+		return nil, err
+	}
+
 	return s.teamRepo.GetTeamsByMatchID(ctx, matchID)
 }
