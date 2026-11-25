@@ -94,7 +94,7 @@ class RosterViewModel(
         )
     }
 
-    fun togglePlayerActive(player: Player, token: String = "dev-token") {
+    fun togglePlayerActive(player: Player, token: String = com.f4f.arena.data.auth.SessionManager.getBearerToken()) {
         viewModelScope.launch {
             val updatedStatus = !player.isActive
             repository.updatePlayer(token, player.id, UpdatePlayerRequest(isActive = updatedStatus))
@@ -109,7 +109,7 @@ class RosterViewModel(
         }
     }
 
-    fun createPlayer(name: String, position: Position, notes: String?, token: String = "dev-token") {
+    fun createPlayer(name: String, position: Position, notes: String?, token: String = com.f4f.arena.data.auth.SessionManager.getBearerToken()) {
         viewModelScope.launch {
             repository.createPlayer(
                 token,

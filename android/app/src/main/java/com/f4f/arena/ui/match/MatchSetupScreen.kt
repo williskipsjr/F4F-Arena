@@ -20,12 +20,14 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.f4f.arena.data.model.Match
 import com.f4f.arena.data.model.MatchFormat
+import com.f4f.arena.data.model.MatchStatus
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MatchSetupScreen(
     viewModel: MatchViewModel = viewModel(),
-    onOpenAttendance: (String) -> Unit
+    onOpenAttendance: (String) -> Unit,
+    onOpenTeams: (String) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showCreateDialog by remember { mutableStateOf(false) }
@@ -95,7 +97,8 @@ fun MatchSetupScreen(
                             items(state.matches, key = { it.id }) { match ->
                                 MatchCard(
                                     match = match,
-                                    onClick = { onOpenAttendance(match.id) }
+                                    onClick = { onOpenAttendance(match.id) },
+                                    onOpenTeams = { onOpenTeams(match.id) }
                                 )
                             }
                         }
@@ -121,7 +124,8 @@ fun MatchSetupScreen(
 @Composable
 fun MatchCard(
     match: Match,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onOpenTeams: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier
@@ -169,13 +173,23 @@ fun MatchCard(
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary
                 )
-                Button(
-                    onClick = onClick,
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Check In")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (match.status == MatchStatus.TEAMS_GENERATED || match.status == MatchStatus.FINALISED) {
+                        OutlinedButton(
+                            onClick = onOpenTeams,
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Text("Teams")
+                        }
+                    }
+                    Button(
+                        onClick = onClick,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Check In")
+                    }
                 }
             }
         }
