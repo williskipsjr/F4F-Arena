@@ -1,8 +1,18 @@
-# F4F Arena
+<p align="center">
+  <img src="docs/assets/f4f-banner.jpg" alt="F4F Arena Banner" width="100%" />
+</p>
 
-Match-day team organisation for the F4F veteran football community.
+<h1 align="center">F4F Arena — Match-Day Team Organisation Platform</h1>
 
-F4F Arena replaces manual WhatsApp list-counting and ad-hoc team picking with a lightweight Android client backed by a Go REST API and PostgreSQL. Organisers can check in arriving players, generate position-balanced teams in under a millisecond, make manual swaps on the pitch, and copy a formatted team sheet directly into WhatsApp.
+<p align="center">
+  <strong>F4F Football4Fitness Community • Position-Balanced Matchmaking & Live Polls</strong>
+</p>
+
+<p align="center">
+  <img src="https://skillicons.dev/icons?i=go,kotlin,androidstudio,postgres,docker,linux" alt="Tech Stack: Go, Kotlin, Android Studio, PostgreSQL, Docker, Linux" />
+</p>
+
+F4F Arena replaces manual WhatsApp list-counting and ad-hoc team picking with a lightweight Android client backed by a Go REST API and PostgreSQL. Organisers can open match polls, track IN/OUT votes, generate position-balanced teams in under a millisecond, reshuffle or swap players on the pitch, and copy a formatted team sheet directly into WhatsApp.
 
 ---
 
