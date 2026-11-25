@@ -2,6 +2,7 @@ package com.f4f.arena
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -40,7 +41,25 @@ class MainActivity : ComponentActivity() {
 
                 val token by SessionManager.token.collectAsState()
                 val adminUser by SessionManager.adminUsername.collectAsState()
+                val authPromptRequired by SessionManager.authPromptRequired.collectAsState()
                 val isLoggedIn = !token.isNullOrBlank()
+
+                LaunchedEffect(authPromptRequired) {
+                    if (authPromptRequired) {
+                        showLoginDialog = true
+                        SessionManager.consumeAuthPrompt()
+                    }
+                }
+
+                BackHandler(
+                    enabled = currentDestination == AppDestination.MATCHES &&
+                        (activeTeamBoardMatchId != null || activeAttendanceMatchId != null)
+                ) {
+                    when {
+                        activeTeamBoardMatchId != null -> activeTeamBoardMatchId = null
+                        activeAttendanceMatchId != null -> activeAttendanceMatchId = null
+                    }
+                }
 
                 Scaffold(
                     bottomBar = {

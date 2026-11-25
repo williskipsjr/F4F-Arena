@@ -53,7 +53,8 @@ class MatchViewModel(
         format: MatchFormat,
         venue: String?,
         token: String = com.f4f.arena.data.auth.SessionManager.getBearerToken(),
-        onSuccess: (Match) -> Unit
+        onSuccess: (Match) -> Unit,
+        onError: (String) -> Unit = {}
     ) {
         viewModelScope.launch {
             val req = CreateMatchRequest(
@@ -66,8 +67,8 @@ class MatchViewModel(
                     loadMatches()
                     onSuccess(newMatch)
                 }
-                .onFailure {
-                    loadMatches()
+                .onFailure { err ->
+                    onError(err.localizedMessage ?: "Failed to create match")
                 }
         }
     }

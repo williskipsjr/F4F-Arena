@@ -112,8 +112,8 @@ fun TeamBoardScreen(
                             modifier = Modifier.padding(24.dp)
                         ) {
                             Text(text = state.message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge)
-                            Button(onClick = { viewModel.generateTeams(matchId) }) {
-                                Text("Retry Generation")
+                            Button(onClick = { viewModel.loadOrGenerateTeams(matchId) }) {
+                                Text("Retry")
                             }
                         }
                     }

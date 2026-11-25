@@ -6,8 +6,16 @@
 # Or on Windows: sdk.dir=C\:\\Users\\username\\AppData\\Local\\Android\\Sdk
 # Or on macOS: sdk.dir=/Users/username/Library/Android/sdk
 
-# API Base URL configuration:
-# For Android Emulator: 
+# API Base URL configuration (do NOT wrap in quotes):
+# For Android Emulator:
 # f4f.api.base_url=http://10.0.2.2:8080/
 # For Physical Device over Wi-Fi (replace with your development machine's LAN IP):
 # f4f.api.base_url=http://192.168.1.100:8080/
+# For Production Release APK (HTTPS):
+# f4f.api.base_url=https://api.yourdomain.com/
+
+# Optional Release APK Signing (for ./gradlew assembleRelease):
+# f4f.release.store_file=/path/to/f4f-release.jks
+# f4f.release.store_password=your_store_password
+# f4f.release.key_alias=f4f-release
+# f4f.release.key_password=your_key_password

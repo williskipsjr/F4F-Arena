@@ -45,6 +45,12 @@ func (s *teamService) GenerateTeams(ctx context.Context, matchID string, subPoli
 	if err != nil {
 		return nil, err
 	}
+	if match.Status == domain.StatusFinalised {
+		return nil, domain.ErrMatchFinalised
+	}
+	if match.Status == domain.StatusCompleted || match.Status == domain.StatusCancelled {
+		return nil, domain.ErrMatchCompleted
+	}
 
 	subPolicy := match.SubPolicy
 	if subPolicyOverride != nil && subPolicyOverride.IsValid() {

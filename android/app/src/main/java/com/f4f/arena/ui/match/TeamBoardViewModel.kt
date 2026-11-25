@@ -39,10 +39,17 @@ class TeamBoardViewModel(
         viewModelScope.launch {
             _uiState.value = TeamBoardUiState.Loading
             val getResult = repository.getTeams(matchId)
-            if (getResult.isSuccess && getResult.getOrNull()?.teams?.isNotEmpty() == true) {
-                _uiState.value = TeamBoardUiState.Success(data = getResult.getOrNull()!!)
+            if (getResult.isSuccess) {
+                val existing = getResult.getOrNull()
+                if (existing != null && existing.teams.isNotEmpty()) {
+                    _uiState.value = TeamBoardUiState.Success(data = existing)
+                } else {
+                    generateTeams(matchId, subPolicy = null, token = token)
+                }
             } else {
-                generateTeams(matchId, subPolicy = null, token = token)
+                _uiState.value = TeamBoardUiState.Error(
+                    getResult.exceptionOrNull()?.message ?: "Failed to load teams"
+                )
             }
         }
     }

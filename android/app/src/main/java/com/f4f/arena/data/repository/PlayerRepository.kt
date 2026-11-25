@@ -29,6 +29,9 @@ class PlayerRepository(
                 val response = playerApi.createPlayer(bearer, request)
                 if (response.isSuccessful && response.body() != null) {
                     Result.success(response.body()!!.data)
+                } else if (response.code() == 401) {
+                    com.f4f.arena.data.auth.SessionManager.onUnauthorized()
+                    Result.failure(Exception("Admin sign-in required or session expired (HTTP 401)"))
                 } else {
                     Result.failure(Exception("Failed to create player: HTTP ${response.code()}"))
                 }
@@ -44,6 +47,9 @@ class PlayerRepository(
                 val response = playerApi.updatePlayer(bearer, id, request)
                 if (response.isSuccessful && response.body() != null) {
                     Result.success(response.body()!!.data)
+                } else if (response.code() == 401) {
+                    com.f4f.arena.data.auth.SessionManager.onUnauthorized()
+                    Result.failure(Exception("Admin sign-in required or session expired (HTTP 401)"))
                 } else {
                     Result.failure(Exception("Failed to update player: HTTP ${response.code()}"))
                 }

@@ -13,7 +13,17 @@ if (localPropertiesFile.exists()) {
     localProperties.load(localPropertiesFile.inputStream())
 }
 
-val configuredApiBaseUrl = localProperties.getProperty("f4f.api.base_url") ?: "http://10.0.2.2:8080/"
+val rawApiBaseUrl = localProperties.getProperty("f4f.api.base_url")?.trim()?.removeSurrounding("\"")
+val configuredApiBaseUrl = if (!rawApiBaseUrl.isNullOrBlank()) rawApiBaseUrl else "http://10.0.2.2:8080/"
+
+val releaseStoreFile = localProperties.getProperty("f4f.release.store_file") ?: System.getenv("F4F_KEYSTORE_PATH")
+val releaseStorePassword = localProperties.getProperty("f4f.release.store_password") ?: System.getenv("F4F_KEYSTORE_PASSWORD")
+val releaseKeyAlias = localProperties.getProperty("f4f.release.key_alias") ?: System.getenv("F4F_KEY_ALIAS")
+val releaseKeyPassword = localProperties.getProperty("f4f.release.key_password") ?: System.getenv("F4F_KEY_PASSWORD")
+val hasReleaseSigning = !releaseStoreFile.isNullOrBlank() &&
+    !releaseStorePassword.isNullOrBlank() &&
+    !releaseKeyAlias.isNullOrBlank() &&
+    !releaseKeyPassword.isNullOrBlank()
 
 android {
     namespace = "com.f4f.arena"
@@ -34,8 +44,22 @@ android {
         buildConfigField("String", "API_BASE_URL", "\"$configuredApiBaseUrl\"")
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

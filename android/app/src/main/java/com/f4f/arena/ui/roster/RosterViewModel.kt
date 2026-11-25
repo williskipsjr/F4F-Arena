@@ -25,7 +25,8 @@ sealed interface RosterUiState {
         val defenderCount: Int = 0,
         val midfielderCount: Int = 0,
         val strikerCount: Int = 0,
-        val totalCount: Int = 0
+        val totalCount: Int = 0,
+        val actionMessage: String? = null
     ) : RosterUiState
     data class Error(val message: String) : RosterUiState
 }
@@ -69,7 +70,7 @@ class RosterViewModel(
         applyFilterAndSearch()
     }
 
-    private fun applyFilterAndSearch() {
+    private fun applyFilterAndSearch(actionMessage: String? = null) {
         val filtered = rawPlayers.filter { player ->
             val matchesFilter = currentFilter == null || player.primaryPosition == currentFilter
             val matchesQuery = currentQuery.isBlank() || player.displayName.contains(currentQuery, ignoreCase = true)
@@ -90,8 +91,14 @@ class RosterViewModel(
             defenderCount = def,
             midfielderCount = mid,
             strikerCount = str,
-            totalCount = rawPlayers.size
+            totalCount = rawPlayers.size,
+            actionMessage = actionMessage
         )
+    }
+
+    fun clearActionMessage() {
+        val current = _uiState.value as? RosterUiState.Success ?: return
+        _uiState.value = current.copy(actionMessage = null)
     }
 
     fun togglePlayerActive(player: Player, token: String = com.f4f.arena.data.auth.SessionManager.getBearerToken()) {
@@ -102,9 +109,8 @@ class RosterViewModel(
                     rawPlayers = rawPlayers.map { if (it.id == updated.id) updated else it }
                     applyFilterAndSearch()
                 }
-                .onFailure {
-                    // Refresh in case of out-of-sync
-                    loadRoster()
+                .onFailure { err ->
+                    applyFilterAndSearch(actionMessage = err.localizedMessage ?: "Failed to update player")
                 }
         }
     }
@@ -121,6 +127,8 @@ class RosterViewModel(
                 )
             ).onSuccess {
                 loadRoster()
+            }.onFailure { err ->
+                applyFilterAndSearch(actionMessage = err.localizedMessage ?: "Failed to add player")
             }
         }
     }
