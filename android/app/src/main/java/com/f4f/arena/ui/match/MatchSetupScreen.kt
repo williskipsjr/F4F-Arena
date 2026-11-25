@@ -107,13 +107,29 @@ fun MatchSetupScreen(
             }
 
             if (showCreateDialog) {
+                var isCreating by remember { mutableStateOf(false) }
+                var createError by remember { mutableStateOf<String?>(null) }
                 CreateMatchDialog(
-                    onDismiss = { showCreateDialog = false },
+                    isCreating = isCreating,
+                    errorMessage = createError,
+                    onDismiss = { if (!isCreating) showCreateDialog = false },
                     onConfirm = { title, format, venue ->
-                        viewModel.createMatch(title, format, venue) { created ->
-                            showCreateDialog = false
-                            onOpenAttendance(created.id)
-                        }
+                        isCreating = true
+                        createError = null
+                        viewModel.createMatch(
+                            title = title,
+                            format = format,
+                            venue = venue,
+                            onSuccess = { created ->
+                                isCreating = false
+                                showCreateDialog = false
+                                onOpenAttendance(created.id)
+                            },
+                            onError = { msg ->
+                                isCreating = false
+                                createError = msg
+                            }
+                        )
                     }
                 )
             }
@@ -198,6 +214,8 @@ fun MatchCard(
 
 @Composable
 fun CreateMatchDialog(
+    isCreating: Boolean = false,
+    errorMessage: String? = null,
     onDismiss: () -> Unit,
     onConfirm: (String, MatchFormat, String?) -> Unit
 ) {
@@ -256,20 +274,28 @@ fun CreateMatchDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+                if (errorMessage != null) {
+                    Text(
+                        text = errorMessage,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
         },
         confirmButton = {
             Button(
+                enabled = !isCreating,
                 onClick = {
                     val finalTitle = title.ifBlank { "Session ${selectedFormat.label}" }
                     onConfirm(finalTitle, selectedFormat, venue.ifBlank { null })
                 }
             ) {
-                Text("Proceed to Attendance")
+                Text(if (isCreating) "Creating..." else "Proceed to Attendance")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(enabled = !isCreating, onClick = onDismiss) { Text("Cancel") }
         }
     )
 }

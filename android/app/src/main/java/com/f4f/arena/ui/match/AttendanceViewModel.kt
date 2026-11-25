@@ -167,7 +167,13 @@ class AttendanceViewModel(
                 allRoster = allRoster + newPlayer
                 selectedIds.add(newPlayer.id)
                 updateCalculatedState(saveMessage = "Guest added & checked in!")
+            }.onFailure { err ->
+                updateCalculatedState(saveMessage = "Failed to add guest: ${err.localizedMessage ?: err.message}")
             }
         }
+    }
+
+    fun clearSaveMessage() {
+        updateCalculatedState(saveMessage = null)
     }
 }

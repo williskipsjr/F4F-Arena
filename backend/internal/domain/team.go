@@ -8,6 +8,7 @@ import (
 var (
 	ErrAssignmentNotFound = errors.New("player assignment not found for this match")
 	ErrMatchCompleted     = errors.New("cannot edit a completed or cancelled match")
+	ErrMatchFinalised     = errors.New("cannot edit a finalised match")
 	ErrTargetTeamNotFound = errors.New("target team does not exist for this match")
 	ErrPlayerNotAttendee  = errors.New("player is not an attendee in this match")
 	ErrCannotSwapSelf     = errors.New("cannot swap a player with themselves")

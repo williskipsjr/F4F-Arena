@@ -7,7 +7,7 @@
 - **Content Type:** `application/json; charset=utf-8`
 - **Date/Time Format:** ISO 8601 UTC (`YYYY-MM-DDTHH:MM:SSZ`)
 - **ID Representation:** String UUIDv4 (`550e8400-e29b-41d4-a716-446655440000`)
-- **Authentication (MVP):** Simple Admin API Key / Bearer token via `X-Admin-Key` or `Authorization: Bearer <token>` header on mutating endpoints. Public reads can be relaxed or similarly protected.
+- **Authentication (MVP):** Bearer JWT returned by `POST /api/v1/auth/login`, sent via `Authorization: Bearer <token>` header on mutating endpoints. Public reads do not require authentication.
 
 ---
 

@@ -34,8 +34,18 @@ fun RosterScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    val actionMessage = (uiState as? RosterUiState.Success)?.actionMessage
+    LaunchedEffect(actionMessage) {
+        if (actionMessage != null) {
+            snackbarHostState.showSnackbar(actionMessage)
+            viewModel.clearActionMessage()
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Player Roster", fontWeight = FontWeight.Bold) },

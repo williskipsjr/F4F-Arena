@@ -41,12 +41,22 @@ fun AttendanceScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showGuestDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(matchId) {
         viewModel.loadMatchAttendance(matchId)
     }
 
+    val saveMessage = (uiState as? AttendanceUiState.Success)?.saveMessage
+    LaunchedEffect(saveMessage) {
+        if (saveMessage != null) {
+            snackbarHostState.showSnackbar(saveMessage)
+            viewModel.clearSaveMessage()
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Match Attendance", fontWeight = FontWeight.Bold) },

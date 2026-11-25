@@ -156,9 +156,9 @@ go test -v -race ./...
 
 1. Open `android/` in **Android Studio**.
 2. On an **Android Emulator**, the app automatically targets `http://10.0.2.2:8080/`.
-3. On a **physical device** on the same Wi-Fi/LAN, set your machine's LAN IP in `android/local.properties`:
+3. On a **physical device** on the same Wi-Fi/LAN, set your machine's LAN IP in `android/local.properties` (without quotes):
    ```properties
-   API_BASE_URL=http://192.168.x.x:8080/
+   f4f.api.base_url=http://192.168.x.x:8080/
    ```
 4. Launch the app and tap **Admin Login** in the top bar to authenticate before creating matches, checking in players, or editing teams.
 

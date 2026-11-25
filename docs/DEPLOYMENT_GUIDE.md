@@ -30,7 +30,7 @@ This guide covers deploying the F4F Arena Go API, PostgreSQL 16 database, and au
    cd F4F-Arena/deployments
    cp .env.production.example .env.production
    ```
-   Edit `.env.production` and set strong random values for `POSTGRES_PASSWORD`, `ADMIN_PASSWORD_HASH`, `JWT_SECRET`, and your `DOMAIN_NAME`.
+   Edit `.env.production` and set strong random values for `POSTGRES_PASSWORD`, `ADMIN_PASSPHRASE`, `JWT_SECRET`, and your `DOMAIN_NAME`.
 
 3. **Build and start the production stack:**
    ```bash
@@ -75,8 +75,8 @@ Backups are gzipped SQL dumps with automatic 14-day retention pruning. To restor
 
 ## 4. Pointing the Android App to Production
 
-In `android/local.properties` (or `app/build.gradle.kts` release `buildConfigField`), set:
+In `android/local.properties`, set (without quotes):
 ```properties
-API_BASE_URL="https://api.f4f-arena.example.com/"
+f4f.api.base_url=https://api.f4f-arena.example.com/
 ```
-Build the signed release APK in Android Studio (`Build > Generate Signed Bundle / APK`) and distribute to match-day admins.
+Build the signed release APK in Android Studio (`Build > Generate Signed Bundle / APK`) or via `./gradlew assembleRelease` (with signing properties configured in `local.properties`) and distribute to match-day admins.

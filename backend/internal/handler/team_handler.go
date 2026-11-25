@@ -44,6 +44,10 @@ func (h *TeamHandler) GenerateTeams(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "NOT_FOUND", "Match not found")
 			return
 		}
+		if errors.Is(err, domain.ErrMatchFinalised) || errors.Is(err, domain.ErrMatchCompleted) {
+			writeError(w, http.StatusConflict, "MATCH_LOCKED", err.Error())
+			return
+		}
 		if errors.Is(err, matchmaker.ErrNoAttendees) || errors.Is(err, matchmaker.ErrInsufficientAttendees) {
 			writeError(w, http.StatusUnprocessableEntity, "INSUFFICIENT_ATTENDEES", err.Error())
 			return
@@ -68,6 +72,10 @@ func (h *TeamHandler) GetTeams(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, domain.ErrMatchNotFound) {
 			writeError(w, http.StatusNotFound, "NOT_FOUND", "Match not found")
+			return
+		}
+		if errors.Is(err, domain.ErrMatchFinalised) || errors.Is(err, domain.ErrMatchCompleted) {
+			writeError(w, http.StatusConflict, "MATCH_LOCKED", err.Error())
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error())
@@ -98,7 +106,7 @@ func (h *TeamHandler) SwapPlayers(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "NOT_FOUND", err.Error())
 			return
 		}
-		if errors.Is(err, domain.ErrMatchCompleted) {
+		if errors.Is(err, domain.ErrMatchCompleted) || errors.Is(err, domain.ErrMatchFinalised) {
 			writeError(w, http.StatusConflict, "MATCH_LOCKED", err.Error())
 			return
 		}
@@ -134,11 +142,15 @@ func (h *TeamHandler) MovePlayer(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "NOT_FOUND", "Match not found")
 			return
 		}
+		if errors.Is(err, domain.ErrMatchFinalised) || errors.Is(err, domain.ErrMatchCompleted) {
+			writeError(w, http.StatusConflict, "MATCH_LOCKED", err.Error())
+			return
+		}
 		if errors.Is(err, domain.ErrTargetTeamNotFound) || errors.Is(err, domain.ErrPlayerNotAttendee) {
 			writeError(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
 			return
 		}
-		if errors.Is(err, domain.ErrMatchCompleted) {
+		if errors.Is(err, domain.ErrMatchCompleted) || errors.Is(err, domain.ErrMatchFinalised) {
 			writeError(w, http.StatusConflict, "MATCH_LOCKED", err.Error())
 			return
 		}
@@ -164,7 +176,11 @@ func (h *TeamHandler) FinaliseMatch(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "NOT_FOUND", "Match not found")
 			return
 		}
-		if errors.Is(err, domain.ErrMatchCompleted) {
+		if errors.Is(err, domain.ErrMatchFinalised) || errors.Is(err, domain.ErrMatchCompleted) {
+			writeError(w, http.StatusConflict, "MATCH_LOCKED", err.Error())
+			return
+		}
+		if errors.Is(err, domain.ErrMatchCompleted) || errors.Is(err, domain.ErrMatchFinalised) {
 			writeError(w, http.StatusConflict, "MATCH_LOCKED", err.Error())
 			return
 		}
@@ -188,6 +204,10 @@ func (h *TeamHandler) GetWhatsAppExport(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		if errors.Is(err, domain.ErrMatchNotFound) {
 			writeError(w, http.StatusNotFound, "NOT_FOUND", "Match not found")
+			return
+		}
+		if errors.Is(err, domain.ErrMatchFinalised) || errors.Is(err, domain.ErrMatchCompleted) {
+			writeError(w, http.StatusConflict, "MATCH_LOCKED", err.Error())
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error())

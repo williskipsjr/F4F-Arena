@@ -34,12 +34,17 @@ func Load() *Config {
 		expiryHours = 24
 	}
 
+	adminPassphrase := getEnv("ADMIN_PASSPHRASE", "")
+	if adminPassphrase == "" {
+		adminPassphrase = getEnv("ADMIN_PASSWORD_HASH", "f4f_arena_secret_passphrase")
+	}
+
 	return &Config{
 		ServerPort:       getEnv("SERVER_PORT", "8080"),
 		ServerEnv:        getEnv("SERVER_ENV", "development"),
 		DatabaseURL:      dbURL,
 		AdminUsername:    getEnv("ADMIN_USERNAME", "admin"),
-		AdminPassword:    getEnv("ADMIN_PASSWORD_HASH", "f4f_arena_secret_passphrase"),
+		AdminPassword:    adminPassphrase,
 		JWTSecret:        getEnv("JWT_SECRET", "f4f_arena_dev_jwt_secret_key_32bytes_min!"),
 		TokenExpiryHours: time.Duration(expiryHours) * time.Hour,
 	}

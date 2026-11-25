@@ -18,6 +18,9 @@ class TeamRepository(
                 val response = teamApi.generateTeams(bearer, matchId, GenerateTeamsRequest(subPolicy))
                 if (response.isSuccessful && response.body() != null) {
                     Result.success(response.body()!!.data)
+                } else if (response.code() == 401) {
+                    com.f4f.arena.data.auth.SessionManager.onUnauthorized()
+                    Result.failure(Exception("Admin sign-in required or session expired (HTTP 401)"))
                 } else {
                     Result.failure(Exception("Failed to generate teams: HTTP ${response.code()}"))
                 }
@@ -47,6 +50,9 @@ class TeamRepository(
                 val response = teamApi.swapPlayers(bearer, matchId, SwapPlayersRequest(playerAId, playerBId))
                 if (response.isSuccessful && response.body() != null) {
                     Result.success(response.body()!!.data)
+                } else if (response.code() == 401) {
+                    com.f4f.arena.data.auth.SessionManager.onUnauthorized()
+                    Result.failure(Exception("Admin sign-in required or session expired (HTTP 401)"))
                 } else {
                     Result.failure(Exception("Failed to swap players: HTTP ${response.code()}"))
                 }
@@ -73,6 +79,9 @@ class TeamRepository(
                 )
                 if (response.isSuccessful && response.body() != null) {
                     Result.success(response.body()!!.data)
+                } else if (response.code() == 401) {
+                    com.f4f.arena.data.auth.SessionManager.onUnauthorized()
+                    Result.failure(Exception("Admin sign-in required or session expired (HTTP 401)"))
                 } else {
                     Result.failure(Exception("Failed to move player: HTTP ${response.code()}"))
                 }
@@ -88,6 +97,9 @@ class TeamRepository(
                 val response = teamApi.finaliseMatch(bearer, matchId)
                 if (response.isSuccessful && response.body() != null) {
                     Result.success(response.body()!!.data)
+                } else if (response.code() == 401) {
+                    com.f4f.arena.data.auth.SessionManager.onUnauthorized()
+                    Result.failure(Exception("Admin sign-in required or session expired (HTTP 401)"))
                 } else {
                     Result.failure(Exception("Failed to finalise match: HTTP ${response.code()}"))
                 }

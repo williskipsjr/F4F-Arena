@@ -256,6 +256,9 @@ func (r *TeamRepository) SwapPlayers(ctx context.Context, matchID, playerAID, pl
 		}
 		return fmt.Errorf("failed fetching match status: %w", err)
 	}
+	if matchStatus == string(domain.StatusFinalised) {
+		return domain.ErrMatchFinalised
+	}
 	if matchStatus == string(domain.StatusCompleted) || matchStatus == string(domain.StatusCancelled) {
 		return domain.ErrMatchCompleted
 	}
@@ -398,6 +401,9 @@ func (r *TeamRepository) MovePlayer(ctx context.Context, matchID string, input d
 			return domain.ErrMatchNotFound
 		}
 		return fmt.Errorf("failed fetching match status: %w", err)
+	}
+	if matchStatus == string(domain.StatusFinalised) {
+		return domain.ErrMatchFinalised
 	}
 	if matchStatus == string(domain.StatusCompleted) || matchStatus == string(domain.StatusCancelled) {
 		return domain.ErrMatchCompleted
