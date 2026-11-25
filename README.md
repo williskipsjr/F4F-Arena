@@ -1,22 +1,174 @@
-# F4F App — PRD Pack
+# F4F Arena
 
-A modular product requirements pack for the F4F veteran football community Android app.
+Match-day team organisation for the F4F veteran football community.
 
-## Documents
-1. `01-product-overview.md` — problem, users, goals and scope.
-2. `02-functional-requirements.md` — roster, attendance, team generation and admin requirements.
-3. `03-team-matching-engine.md` — position-aware balancing rules and edge cases.
-4. `04-whatsapp-team-export.md` — copy/paste message format and acceptance criteria.
-5. `05-technical-architecture.md` — Android, Go, PostgreSQL and deployment direction.
-6. `06-player-roster.md` — corrected initial roster of 42 unique players.
-7. `07-roadmap-testing-and-risks.md` — phased roadmap, tests and risks.
+F4F Arena replaces manual WhatsApp list-counting and ad-hoc team picking with a lightweight Android client backed by a Go REST API and PostgreSQL. Organisers can check in arriving players, generate position-balanced teams in under a millisecond, make manual swaps on the pitch, and copy a formatted team sheet directly into WhatsApp.
 
-## Decisions captured
-- Android-first: Kotlin + Jetpack Compose.
-- Backend: Go; database: PostgreSQL.
-- Initial roster: 42 unique players after removing the duplicate Lenpu row.
-- Positions: 5 Keepers, 14 Defenders, 14 Midfielders, 9 Strikers.
-- Main flow: admin selects attendees → chooses format → generates teams → manually adjusts → copies WhatsApp-ready distribution.
-- Payments, push notifications and player self-service are later phases.
+---
 
-The 42-player list is the initial roster supplied for this exercise; it is not assumed to represent the full 90–100-member community.
+## Core Features
+
+- **Player Roster Management** — Maintains the community roster (seeded with 42 initial players across `KEEPER`, `DEFENDER`, `MIDFIELDER`, and `STRIKER`), active/inactive status, and quick guest additions on match day.
+- **Match Setup & Live Attendance** — Supports `6-a-side` (1-2-2-1), `7-a-side` (1-3-2-1), and `9-a-side` (1-3-3-2) formats with live headcount, suggested team count, substitute count, and goalkeeper deficit indicators.
+- **Position-Aware Matchmaking Engine** — Standalone pure Go package (`internal/matchmaker`) that balances natural positions across teams, distributes goalkeepers round-robin, flags missing keepers (`Needs Emergency GK`) without forcing outfielders into goal, and supports both `STRICT_SUBSTITUTES` (rotating bench) and `DISTRIBUTE_ALL` remainder policies.
+- **Interactive Team Review & Editing** — Tap-to-swap players across teams or the bench, move players directly (including late arrivals), track manual overrides, and lock final teams (`FINALISED`).
+- **WhatsApp Export** — Generates a plain-text WhatsApp message grouped by position (with optional bib colours, emergency keeper tags, and substitutes) from both the API and offline Android UI state, with one-tap clipboard copy and Android share sheet support.
+- **Admin JWT Authentication** — Public read access for viewing rosters, matches, and teams; server-side credentials issuing short-lived Bearer JWTs for all mutations.
+
+---
+
+## System Architecture
+
+F4F Arena uses a three-tier client-server architecture designed to run on a single Linux host within a ₹0/month hosting budget.
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                     Android Client                       │
+│         Kotlin • Jetpack Compose • Material 3            │
+│   UI Screens ──► ViewModels (StateFlow) ──► Retrofit     │
+└────────────────────────────┬─────────────────────────────┘
+                             │ HTTPS / JSON REST
+                             ▼
+┌──────────────────────────────────────────────────────────┐
+│                       Linux Host                         │
+│                                                          │
+│   ┌──────────────────────────────────────────────────┐   │
+│   │                 Caddy 2 Proxy                    │   │
+│   │        Automatic Let's Encrypt TLS (80/443)      │   │
+│   └────────────────────────┬─────────────────────────┘   │
+│                            │ HTTP :8080 (Docker network) │
+│                            ▼                             │
+│   ┌──────────────────────────────────────────────────┐   │
+│   │                   Go API Server                  │   │
+│   │   Chi Router ─► Services ─► pgx/v5 Repository    │   │
+│   │                    └─► Matchmaker Engine (pure)  │   │
+│   └────────────────────────┬─────────────────────────┘   │
+│                            │ SQL                         │
+│                            ▼                             │
+│   ┌──────────────────────────────────────────────────┐   │
+│   │                  PostgreSQL 16                   │   │
+│   │       ACID transactions • Foreign keys • UUIDs   │   │
+│   └──────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────┘
+```
+
+### Technology Stack
+
+| Layer | Technology | Notes |
+| :--- | :--- | :--- |
+| **Android App** | Kotlin, Jetpack Compose, Material 3, Retrofit, OkHttp | Package `com.f4f.arena`; targets Android Studio + Emulator/Device |
+| **Backend API** | Go 1.25, `go-chi/chi/v5`, `golang-jwt/jwt/v5` | Single static binary; clean handler → service → repository separation |
+| **Database** | PostgreSQL 16, `jackc/pgx/v5` | Parameterised raw SQL (no ORM); explicit CLI migrations |
+| **Infrastructure** | Docker, Docker Compose, Caddy 2 | Isolated internal network; automated `pg_dump` backups |
+
+---
+
+## Repository Structure
+
+```text
+F4F/
+├── android/                        # Kotlin + Jetpack Compose Android app (com.f4f.arena)
+│   └── app/src/
+│       ├── main/java/com/f4f/arena/
+│       │   ├── data/               # Retrofit APIs, models, repositories, SessionManager
+│       │   ├── ui/                 # Compose screens & ViewModels (Roster, Match, TeamBoard)
+│       │   └── util/               # Offline WhatsAppFormatter
+│       └── test/                   # JUnit model & formatter tests
+├── backend/                        # Go REST API & migration CLI
+│   ├── cmd/
+│   │   ├── api/main.go             # HTTP server entry point
+│   │   └── migrate/main.go         # Explicit SQL migration runner
+│   ├── internal/
+│   │   ├── auth/                   # JWT generation & Bearer middleware
+│   │   ├── config/                 # Environment configuration loader
+│   │   ├── database/               # pgxpool connection manager
+│   │   ├── domain/                 # Entities, enums, validation & domain errors
+│   │   ├── handler/                # Chi HTTP handlers
+│   │   ├── matchmaker/             # Pure position-balancing engine + 13 edge-case tests
+│   │   ├── repository/postgres/    # Parameterised PostgreSQL repositories
+│   │   └── service/                # Business orchestration & WhatsApp formatting
+│   ├── migrations/                 # Versioned .up.sql / .down.sql files + 42-player seed
+│   └── Dockerfile                  # Multi-stage production build (API + migrate binary)
+├── deployments/
+│   ├── docker-compose.yml          # Local PostgreSQL 16 container
+│   ├── docker-compose.prod.yml     # Production stack (PostgreSQL + Go API + Caddy)
+│   ├── Caddyfile                   # Automatic HTTPS reverse proxy config
+│   ├── .env.example                # Local environment template
+│   ├── .env.production.example     # Production environment template
+│   └── scripts/                    # backup_db.sh & restore_db.sh
+└── docs/                           # Architecture, API spec, DB design, deployment & pilot docs
+```
+
+---
+
+## Local Development Setup
+
+### Prerequisites
+
+- **Go** 1.25+
+- **Docker** & **Docker Compose**
+- **Android Studio** (for building/running the Android app)
+
+### 1. Start PostgreSQL
+
+```bash
+docker compose -f deployments/docker-compose.yml up -d
+```
+
+Wait until the `f4f_arena_postgres` container reports healthy (`docker ps`).
+
+### 2. Run Database Migrations & Seed Roster
+
+Migrations are explicit and never run automatically on API startup:
+
+```bash
+cd backend
+go run cmd/migrate/main.go up
+```
+
+This creates the schema (`players`, `matches`, `match_attendees`, `teams`, `team_assignments`) and seeds the 42 initial players.
+
+### 3. Start the Go API Server
+
+```bash
+cd backend
+go run cmd/api/main.go
+```
+
+By default, the server listens on `http://localhost:8080` with development credentials (`admin` / `f4f_arena_secret_passphrase`). Override via environment variables or `deployments/.env.example`.
+
+Verify the server:
+
+```bash
+curl http://localhost:8080/health
+```
+
+### 4. Run Backend Tests
+
+```bash
+cd backend
+go test -v -race ./...
+```
+
+*(Live PostgreSQL persistence tests in `internal/repository/postgres` automatically run when `localhost:5432` is reachable and skip otherwise.)*
+
+### 5. Run the Android App
+
+1. Open `android/` in **Android Studio**.
+2. On an **Android Emulator**, the app automatically targets `http://10.0.2.2:8080/`.
+3. On a **physical device** on the same Wi-Fi/LAN, set your machine's LAN IP in `android/local.properties`:
+   ```properties
+   API_BASE_URL=http://192.168.x.x:8080/
+   ```
+4. Launch the app and tap **Admin Login** in the top bar to authenticate before creating matches, checking in players, or editing teams.
+
+---
+
+## Production Deployment
+
+Production deployment uses `deployments/docker-compose.prod.yml` with Caddy 2 handling automatic HTTPS certificates and `deployments/scripts/backup_db.sh` handling daily gzipped database backups.
+
+- Full VPS setup, migration, and backup cron instructions: [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md)
+- Match-day rehearsal and verification steps: [docs/PILOT_CHECKLIST.md](docs/PILOT_CHECKLIST.md)
+- REST API reference: [docs/API_SPECIFICATION.md](docs/API_SPECIFICATION.md)
+- Database schema: [docs/DATABASE_DESIGN.md](docs/DATABASE_DESIGN.md)
