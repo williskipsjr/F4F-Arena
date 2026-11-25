@@ -75,6 +75,7 @@ func (s *teamService) GenerateTeams(ctx context.Context, matchID string, subPoli
 		Format:    match.Format,
 		SubPolicy: subPolicy,
 		Attendees: players,
+		Shuffle:   true,
 	}
 
 	result, err := s.engine.Generate(req)

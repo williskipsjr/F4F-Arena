@@ -6,14 +6,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -25,17 +23,30 @@ import com.f4f.arena.data.model.MatchStatus
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MatchSetupScreen(
+    isAdmin: Boolean = true,
+    isLoggedIn: Boolean = true,
+    onRequireAuth: () -> Unit = {},
     viewModel: MatchViewModel = viewModel(),
     onOpenAttendance: (String) -> Unit,
     onOpenTeams: (String) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showCreateDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    val actionMessage = (uiState as? MatchUiState.Success)?.actionMessage
+    LaunchedEffect(actionMessage) {
+        if (actionMessage != null) {
+            snackbarHostState.showSnackbar(actionMessage)
+            viewModel.clearActionMessage()
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Match Sessions", fontWeight = FontWeight.Bold) },
+                title = { Text("Match Polls & Sessions", fontWeight = FontWeight.Bold) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     titleContentColor = MaterialTheme.colorScheme.onPrimary
@@ -48,13 +59,15 @@ fun MatchSetupScreen(
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { showCreateDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("New Match") }
-            )
+            if (isAdmin) {
+                ExtendedFloatingActionButton(
+                    onClick = { showCreateDialog = true },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                    text = { Text("New Poll / Match") }
+                )
+            }
         }
     ) { paddingValues ->
         Box(
@@ -80,11 +93,13 @@ fun MatchSetupScreen(
                     if (state.matches.isEmpty()) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Text("No match sessions created yet", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Button(onClick = { showCreateDialog = true }) {
-                                    Icon(Icons.Default.Add, contentDescription = null)
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Create First Match")
+                                Text("No match polls created yet", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (isAdmin) {
+                                    Button(onClick = { showCreateDialog = true }) {
+                                        Icon(Icons.Default.Add, contentDescription = null)
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Create First Match Poll")
+                                    }
                                 }
                             }
                         }
@@ -97,7 +112,24 @@ fun MatchSetupScreen(
                             items(state.matches, key = { it.id }) { match ->
                                 MatchCard(
                                     match = match,
-                                    onClick = { onOpenAttendance(match.id) },
+                                    isAdmin = isAdmin,
+                                    onVote = { vote ->
+                                        if (!isLoggedIn) {
+                                            onRequireAuth()
+                                        } else {
+                                            viewModel.castVote(match.id, vote)
+                                        }
+                                    },
+                                    onSelectFormat = { fmt ->
+                                        viewModel.updateMatchFormat(match.id, fmt)
+                                    },
+                                    onClick = {
+                                        if (isAdmin) {
+                                            onOpenAttendance(match.id)
+                                        } else if (match.status == MatchStatus.TEAMS_GENERATED || match.status == MatchStatus.FINALISED) {
+                                            onOpenTeams(match.id)
+                                        }
+                                    },
                                     onOpenTeams = { onOpenTeams(match.id) }
                                 )
                             }
@@ -113,17 +145,18 @@ fun MatchSetupScreen(
                     isCreating = isCreating,
                     errorMessage = createError,
                     onDismiss = { if (!isCreating) showCreateDialog = false },
-                    onConfirm = { title, format, venue ->
+                    onConfirm = { title, kickoffTime, format, venue, isPollOpen ->
                         isCreating = true
                         createError = null
                         viewModel.createMatch(
                             title = title,
                             format = format,
                             venue = venue,
-                            onSuccess = { created ->
+                            kickoffTime = kickoffTime,
+                            isPollOpen = isPollOpen,
+                            onSuccess = {
                                 isCreating = false
                                 showCreateDialog = false
-                                onOpenAttendance(created.id)
                             },
                             onError = { msg ->
                                 isCreating = false
@@ -140,6 +173,9 @@ fun MatchSetupScreen(
 @Composable
 fun MatchCard(
     match: Match,
+    isAdmin: Boolean = true,
+    onVote: (String) -> Unit = {},
+    onSelectFormat: (MatchFormat) -> Unit = {},
     onClick: () -> Unit,
     onOpenTeams: () -> Unit = {}
 ) {
@@ -161,22 +197,112 @@ fun MatchCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = match.title,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = match.title,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (!match.kickoffTime.isNullOrBlank() || !match.venue.isNullOrBlank()) {
+                        val details = listOfNotNull(
+                            match.kickoffTime?.let { "🕙 $it" },
+                            match.venue?.let { "📍 $it" }
+                        ).joinToString("  •  ")
+                        Text(
+                            text = details,
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
                 AssistChip(
                     onClick = {},
                     label = { Text(match.format.label, fontWeight = FontWeight.SemiBold) }
                 )
             }
 
-            Text(
-                text = "Target template: ${match.format.templateDescription}",
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            // Poll Vote Tally & IN/OUT Buttons
+            if (match.isPollOpen || match.inCount > 0 || match.outCount > 0) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (match.isPollOpen) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = Color(0xFFE8F5E9)
+                            ) {
+                                Text(
+                                    text = "POLL OPEN",
+                                    color = Color(0xFF2E7D32),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        Text(
+                            text = "${match.inCount} IN  •  ${match.outCount} OUT",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
+                if (match.isPollOpen) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val votedIn = match.myVote == "IN"
+                        val votedOut = match.myVote == "OUT"
+                        Button(
+                            onClick = { onVote("IN") },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (votedIn) Color(0xFF2E7D32) else MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Icon(Icons.Default.ThumbUp, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(if (votedIn) "I'm IN ✓" else "Vote IN")
+                        }
+                        OutlinedButton(
+                            onClick = { onVote("OUT") },
+                            modifier = Modifier.weight(1f),
+                            colors = if (votedOut) ButtonDefaults.outlinedButtonColors(
+                                containerColor = Color(0xFFFFEBEE),
+                                contentColor = Color(0xFFC62828)
+                            ) else ButtonDefaults.outlinedButtonColors()
+                        ) {
+                            Text(if (votedOut) "I'm OUT ✓" else "Vote OUT")
+                        }
+                    }
+                }
+            }
+
+            // Admin Quick Format Selector when players have voted IN
+            if (isAdmin && match.inCount > 0 && match.status != MatchStatus.FINALISED) {
+                val suggested = match.inCount / match.format.playersPerTeam
+                val subs = match.inCount % match.format.playersPerTeam
+                Text(
+                    text = "With ${match.inCount} IN (${match.format.label}): $suggested teams, $subs subs",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    MatchFormat.entries.forEach { fmt ->
+                        FilterChip(
+                            selected = match.format == fmt,
+                            onClick = { onSelectFormat(fmt) },
+                            label = { Text(fmt.label, fontSize = 11.sp) }
+                        )
+                    }
+                }
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -190,21 +316,23 @@ fun MatchCard(
                     color = MaterialTheme.colorScheme.primary
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (match.status == MatchStatus.TEAMS_GENERATED || match.status == MatchStatus.FINALISED) {
+                    if (match.status == MatchStatus.TEAMS_GENERATED || match.status == MatchStatus.FINALISED || (isAdmin && match.inCount >= match.format.playersPerTeam)) {
                         OutlinedButton(
                             onClick = onOpenTeams,
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
                         ) {
-                            Text("Teams")
+                            Text(if (match.status == MatchStatus.TEAMS_GENERATED || match.status == MatchStatus.FINALISED) "View Teams" else "Generate Teams")
                         }
                     }
-                    Button(
-                        onClick = onClick,
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Check In")
+                    if (isAdmin) {
+                        Button(
+                            onClick = onClick,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Check In")
+                        }
                     }
                 }
             }
@@ -217,21 +345,31 @@ fun CreateMatchDialog(
     isCreating: Boolean = false,
     errorMessage: String? = null,
     onDismiss: () -> Unit,
-    onConfirm: (String, MatchFormat, String?) -> Unit
+    onConfirm: (String, String?, MatchFormat, String?, Boolean) -> Unit
 ) {
-    var title by remember { mutableStateOf("") }
+    var title by remember { mutableStateOf("Match tonight") }
+    var kickoffTime by remember { mutableStateOf("10:00 PM") }
     var selectedFormat by remember { mutableStateOf(MatchFormat.SEVEN_A_SIDE) }
     var venue by remember { mutableStateOf("Turf Ground") }
+    var openPoll by remember { mutableStateOf(true) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Create Match Session", fontWeight = FontWeight.Bold) },
+        title = { Text("Create Match Poll", fontWeight = FontWeight.Bold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Match Title (e.g. Saturday 7v7)") },
+                    label = { Text("Match Title (e.g. Match tonight)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = kickoffTime,
+                    onValueChange = { kickoffTime = it },
+                    label = { Text("Kickoff Time (e.g. 10:00 PM)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -274,6 +412,16 @@ fun CreateMatchDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Open IN/OUT poll for players", style = MaterialTheme.typography.bodyMedium)
+                    Switch(checked = openPoll, onCheckedChange = { openPoll = it })
+                }
+
                 if (errorMessage != null) {
                     Text(
                         text = errorMessage,
@@ -287,11 +435,17 @@ fun CreateMatchDialog(
             Button(
                 enabled = !isCreating,
                 onClick = {
-                    val finalTitle = title.ifBlank { "Session ${selectedFormat.label}" }
-                    onConfirm(finalTitle, selectedFormat, venue.ifBlank { null })
+                    val finalTitle = title.ifBlank { "Match tonight" }
+                    onConfirm(
+                        finalTitle,
+                        kickoffTime.ifBlank { null },
+                        selectedFormat,
+                        venue.ifBlank { null },
+                        openPoll
+                    )
                 }
             ) {
-                Text(if (isCreating) "Creating..." else "Proceed to Attendance")
+                Text(if (isCreating) "Creating..." else "Create Poll")
             }
         },
         dismissButton = {

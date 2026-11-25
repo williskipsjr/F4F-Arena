@@ -17,6 +17,7 @@ const AdminContextKey contextKey = "admin_claims"
 type Claims struct {
 	Username string `json:"username"`
 	Role     string `json:"role"`
+	PlayerID string `json:"player_id,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -33,10 +34,15 @@ func NewTokenService(secret string, expiry time.Duration) *TokenService {
 }
 
 func (s *TokenService) GenerateToken(username string) (string, time.Time, error) {
+	return s.GenerateTokenWithRole(username, "ADMIN", "")
+}
+
+func (s *TokenService) GenerateTokenWithRole(username, role, playerID string) (string, time.Time, error) {
 	expiresAt := time.Now().Add(s.expiry)
 	claims := &Claims{
 		Username: username,
-		Role:     "ADMIN",
+		Role:     role,
+		PlayerID: playerID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -96,5 +102,16 @@ func (s *TokenService) Middleware(next http.Handler) http.Handler {
 
 		ctx := context.WithValue(r.Context(), AdminContextKey, claims)
 		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func (s *TokenService) RequireAdmin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := r.Context().Value(AdminContextKey).(*Claims)
+		if !ok || claims == nil || claims.Role != "ADMIN" {
+			http.Error(w, `{"error":{"code":"FORBIDDEN","message":"Admin privileges required"}}`, http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
 	})
 }

@@ -33,14 +33,21 @@ func (s *MatchService) CreateMatch(ctx context.Context, input domain.CreateMatch
 		subPolicy = *input.SubPolicy
 	}
 
+	isPollOpen := false
+	if input.IsPollOpen != nil {
+		isPollOpen = *input.IsPollOpen
+	}
+
 	match := &domain.Match{
-		Title:     strings.TrimSpace(input.Title),
-		MatchDate: input.MatchDate,
-		Venue:     input.Venue,
-		Format:    input.Format,
-		Status:    domain.StatusDraft,
-		SubPolicy: subPolicy,
-		Notes:     input.Notes,
+		Title:       strings.TrimSpace(input.Title),
+		MatchDate:   input.MatchDate,
+		KickoffTime: input.KickoffTime,
+		Venue:       input.Venue,
+		Format:      input.Format,
+		Status:      domain.StatusDraft,
+		SubPolicy:   subPolicy,
+		IsPollOpen:  isPollOpen,
+		Notes:       input.Notes,
 	}
 
 	if err := match.Validate(); err != nil {
@@ -76,6 +83,9 @@ func (s *MatchService) UpdateMatch(ctx context.Context, id string, input domain.
 	if input.MatchDate != nil {
 		match.MatchDate = input.MatchDate
 	}
+	if input.KickoffTime != nil {
+		match.KickoffTime = input.KickoffTime
+	}
 	if input.Venue != nil {
 		match.Venue = input.Venue
 	}
@@ -87,6 +97,9 @@ func (s *MatchService) UpdateMatch(ctx context.Context, id string, input domain.
 	}
 	if input.SubPolicy != nil {
 		match.SubPolicy = *input.SubPolicy
+	}
+	if input.IsPollOpen != nil {
+		match.IsPollOpen = *input.IsPollOpen
 	}
 	if input.Notes != nil {
 		match.Notes = input.Notes

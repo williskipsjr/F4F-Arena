@@ -51,10 +51,15 @@ data class Match(
     @SerializedName("id") val id: String,
     @SerializedName("title") val title: String,
     @SerializedName("match_date") val matchDate: String? = null,
+    @SerializedName("kickoff_time") val kickoffTime: String? = null,
     @SerializedName("venue") val venue: String? = null,
     @SerializedName("format") val format: MatchFormat,
     @SerializedName("status") val status: MatchStatus,
     @SerializedName("sub_policy") val subPolicy: SubstitutePolicy,
+    @SerializedName("is_poll_open") val isPollOpen: Boolean = false,
+    @SerializedName("in_count") val inCount: Int = 0,
+    @SerializedName("out_count") val outCount: Int = 0,
+    @SerializedName("my_vote") val myVote: String? = null,
     @SerializedName("notes") val notes: String? = null,
     @SerializedName("created_at") val createdAt: String? = null,
     @SerializedName("updated_at") val updatedAt: String? = null
@@ -97,10 +102,21 @@ data class AttendanceSummaryResponse(
 data class CreateMatchRequest(
     @SerializedName("title") val title: String,
     @SerializedName("match_date") val matchDate: String? = null,
+    @SerializedName("kickoff_time") val kickoffTime: String? = null,
     @SerializedName("venue") val venue: String? = null,
     @SerializedName("format") val format: String,
     @SerializedName("sub_policy") val subPolicy: String? = null,
+    @SerializedName("is_poll_open") val isPollOpen: Boolean = true,
     @SerializedName("notes") val notes: String? = null
+)
+
+data class UpdateMatchRequest(
+    @SerializedName("format") val format: String? = null,
+    @SerializedName("is_poll_open") val isPollOpen: Boolean? = null
+)
+
+data class CastVoteRequest(
+    @SerializedName("vote") val vote: String
 )
 
 data class SyncAttendeesRequest(

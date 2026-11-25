@@ -26,8 +26,8 @@ func NewMatchRepository(pool *pgxpool.Pool) *MatchRepository {
 
 func (r *MatchRepository) Create(ctx context.Context, m *domain.Match) error {
 	query := `
-		INSERT INTO matches (title, match_date, venue, format, status, sub_policy, notes, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO matches (title, match_date, kickoff_time, venue, format, status, sub_policy, is_poll_open, notes, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		RETURNING id, created_at, updated_at
 	`
 	now := time.Now().UTC()
@@ -36,10 +36,12 @@ func (r *MatchRepository) Create(ctx context.Context, m *domain.Match) error {
 		query,
 		m.Title,
 		m.MatchDate,
+		m.KickoffTime,
 		m.Venue,
 		string(m.Format),
 		string(m.Status),
 		string(m.SubPolicy),
+		m.IsPollOpen,
 		m.Notes,
 		now,
 		now,
@@ -53,9 +55,12 @@ func (r *MatchRepository) Create(ctx context.Context, m *domain.Match) error {
 
 func (r *MatchRepository) GetByID(ctx context.Context, id string) (*domain.Match, error) {
 	query := `
-		SELECT id, title, match_date, venue, format, status, sub_policy, notes, created_at, updated_at
-		FROM matches
-		WHERE id = $1
+		SELECT m.id, m.title, m.match_date, m.kickoff_time, m.venue, m.format, m.status, m.sub_policy, m.is_poll_open,
+		       COALESCE((SELECT COUNT(*) FROM match_votes v WHERE v.match_id = m.id AND v.vote = 'IN'), 0),
+		       COALESCE((SELECT COUNT(*) FROM match_votes v WHERE v.match_id = m.id AND v.vote = 'OUT'), 0),
+		       m.notes, m.created_at, m.updated_at
+		FROM matches m
+		WHERE m.id = $1
 	`
 	var m domain.Match
 	var fmtStr, statusStr, subStr string
@@ -63,10 +68,14 @@ func (r *MatchRepository) GetByID(ctx context.Context, id string) (*domain.Match
 		&m.ID,
 		&m.Title,
 		&m.MatchDate,
+		&m.KickoffTime,
 		&m.Venue,
 		&fmtStr,
 		&statusStr,
 		&subStr,
+		&m.IsPollOpen,
+		&m.InCount,
+		&m.OutCount,
 		&m.Notes,
 		&m.CreatedAt,
 		&m.UpdatedAt,
@@ -86,15 +95,18 @@ func (r *MatchRepository) GetByID(ctx context.Context, id string) (*domain.Match
 func (r *MatchRepository) List(ctx context.Context, status *domain.MatchStatus) ([]domain.Match, error) {
 	queryBuilder := strings.Builder{}
 	queryBuilder.WriteString(`
-		SELECT id, title, match_date, venue, format, status, sub_policy, notes, created_at, updated_at
-		FROM matches
+		SELECT m.id, m.title, m.match_date, m.kickoff_time, m.venue, m.format, m.status, m.sub_policy, m.is_poll_open,
+		       COALESCE((SELECT COUNT(*) FROM match_votes v WHERE v.match_id = m.id AND v.vote = 'IN'), 0),
+		       COALESCE((SELECT COUNT(*) FROM match_votes v WHERE v.match_id = m.id AND v.vote = 'OUT'), 0),
+		       m.notes, m.created_at, m.updated_at
+		FROM matches m
 	`)
 	var args []interface{}
 	if status != nil {
-		queryBuilder.WriteString(" WHERE status = $1")
+		queryBuilder.WriteString(" WHERE m.status = $1")
 		args = append(args, string(*status))
 	}
-	queryBuilder.WriteString(" ORDER BY created_at DESC")
+	queryBuilder.WriteString(" ORDER BY m.created_at DESC")
 
 	rows, err := r.pool.Query(ctx, queryBuilder.String(), args...)
 	if err != nil {
@@ -110,10 +122,14 @@ func (r *MatchRepository) List(ctx context.Context, status *domain.MatchStatus) 
 			&m.ID,
 			&m.Title,
 			&m.MatchDate,
+			&m.KickoffTime,
 			&m.Venue,
 			&fmtStr,
 			&statusStr,
 			&subStr,
+			&m.IsPollOpen,
+			&m.InCount,
+			&m.OutCount,
 			&m.Notes,
 			&m.CreatedAt,
 			&m.UpdatedAt,
@@ -133,8 +149,8 @@ func (r *MatchRepository) List(ctx context.Context, status *domain.MatchStatus) 
 func (r *MatchRepository) Update(ctx context.Context, m *domain.Match) error {
 	query := `
 		UPDATE matches
-		SET title = $1, match_date = $2, venue = $3, format = $4, status = $5, sub_policy = $6, notes = $7, updated_at = $8
-		WHERE id = $9
+		SET title = $1, match_date = $2, kickoff_time = $3, venue = $4, format = $5, status = $6, sub_policy = $7, is_poll_open = $8, notes = $9, updated_at = $10
+		WHERE id = $11
 		RETURNING updated_at
 	`
 	now := time.Now().UTC()
@@ -143,10 +159,12 @@ func (r *MatchRepository) Update(ctx context.Context, m *domain.Match) error {
 		query,
 		m.Title,
 		m.MatchDate,
+		m.KickoffTime,
 		m.Venue,
 		string(m.Format),
 		string(m.Status),
 		string(m.SubPolicy),
+		m.IsPollOpen,
 		m.Notes,
 		now,
 		m.ID,
@@ -269,4 +287,81 @@ func (r *MatchRepository) RemoveAttendee(ctx context.Context, matchID string, pl
 		return errors.New("attendee not found in this match")
 	}
 	return nil
+}
+
+// CastVote records a player's IN/OUT vote for a match and keeps match_attendees in sync.
+func (r *MatchRepository) CastVote(ctx context.Context, matchID, playerID, vote string) (*domain.Match, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed starting vote transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var isPollOpen bool
+	err = tx.QueryRow(ctx, "SELECT is_poll_open FROM matches WHERE id = $1", matchID).Scan(&isPollOpen)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrMatchNotFound
+		}
+		return nil, fmt.Errorf("failed checking match poll: %w", err)
+	}
+
+	now := time.Now().UTC()
+	_, err = tx.Exec(ctx, `
+		INSERT INTO match_votes (match_id, player_id, vote, voted_at)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (match_id, player_id)
+		DO UPDATE SET vote = EXCLUDED.vote, voted_at = EXCLUDED.voted_at
+	`, matchID, playerID, vote, now)
+	if err != nil {
+		return nil, fmt.Errorf("failed recording vote: %w", err)
+	}
+
+	if vote == "IN" {
+		_, err = tx.Exec(ctx, `
+			INSERT INTO match_attendees (match_id, player_id, is_late_arrival, checked_in_at)
+			VALUES ($1, $2, false, $3)
+			ON CONFLICT (match_id, player_id) DO NOTHING
+		`, matchID, playerID, now)
+		if err != nil {
+			return nil, fmt.Errorf("failed adding attendee from IN vote: %w", err)
+		}
+	} else {
+		_, err = tx.Exec(ctx, `
+			DELETE FROM match_attendees WHERE match_id = $1 AND player_id = $2
+		`, matchID, playerID)
+		if err != nil {
+			return nil, fmt.Errorf("failed removing attendee from OUT vote: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed committing vote: %w", err)
+	}
+
+	m, err := r.GetByID(ctx, matchID)
+	if err != nil {
+		return nil, err
+	}
+	v := vote
+	m.MyVote = &v
+	return m, nil
+}
+
+// GetPlayerVotesMap returns a map of matchID -> vote ("IN" / "OUT") for a player.
+func (r *MatchRepository) GetPlayerVotesMap(ctx context.Context, playerID string) (map[string]string, error) {
+	rows, err := r.pool.Query(ctx, "SELECT match_id, vote FROM match_votes WHERE player_id = $1", playerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[string]string)
+	for rows.Next() {
+		var mID, vote string
+		if err := rows.Scan(&mID, &vote); err == nil {
+			result[mID] = vote
+		}
+	}
+	return result, nil
 }

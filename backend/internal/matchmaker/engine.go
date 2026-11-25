@@ -2,6 +2,7 @@ package matchmaker
 
 import (
 	"fmt"
+	"math/rand/v2"
 	"sort"
 
 	"github.com/williskipsjr/f4f-arena/backend/internal/domain"
@@ -91,6 +92,13 @@ func (e *Engine) Generate(req MatchmakingRequest) (*MatchmakingResult, error) {
 		default:
 			midfielders = append(midfielders, p)
 		}
+	}
+
+	if req.Shuffle {
+		shufflePlayers(keepers)
+		shufflePlayers(defenders)
+		shufflePlayers(midfielders)
+		shufflePlayers(strikers)
 	}
 
 	assignedIDs := make(map[string]bool)
@@ -213,6 +221,12 @@ func (e *Engine) Generate(req MatchmakingRequest) (*MatchmakingResult, error) {
 		AssignedCount:    totalAssigned,
 		SubstitutesCount: len(substitutes),
 	}, nil
+}
+
+func shufflePlayers(players []domain.Player) {
+	rand.Shuffle(len(players), func(i, j int) {
+		players[i], players[j] = players[j], players[i]
+	})
 }
 
 func positionRank(pos domain.Position) int {
