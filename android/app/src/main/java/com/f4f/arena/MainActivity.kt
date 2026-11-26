@@ -3,6 +3,7 @@ package com.f4f.arena
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -23,6 +24,8 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.f4f.arena.data.api.NetworkClient
 import com.f4f.arena.data.auth.SessionManager
+import com.f4f.arena.data.model.AppVersionResponse
+import com.f4f.arena.data.model.CreateFeedbackRequest
 import com.f4f.arena.data.model.MatchFormat as ApiMatchFormat
 import com.f4f.arena.data.model.MatchStatus
 import com.f4f.arena.data.model.MatchVoteDetail
@@ -70,8 +73,14 @@ private fun F4FArenaApp(
     var activeTeamBoardMatchId by remember { mutableStateOf<String?>(null) }
 
     var showAuthSheet by remember { mutableStateOf(false) }
+    var authInitialSignUp by remember { mutableStateOf(false) }
+    var skippedOnboarding by remember { mutableStateOf(false) }
     var authLoading by remember { mutableStateOf(false) }
     var authError by remember { mutableStateOf<String?>(null) }
+    var availableUpdate by remember { mutableStateOf<AppVersionResponse?>(null) }
+
+    var feedbackItems by remember { mutableStateOf<List<FeedbackItemUi>>(emptyList()) }
+    var isSubmittingFeedback by remember { mutableStateOf(false) }
 
     var showCreatePollModal by remember { mutableStateOf(false) }
     var createPollLoading by remember { mutableStateOf(false) }
@@ -145,7 +154,19 @@ private fun F4FArenaApp(
         }
     }
 
-    LaunchedEffect(Unit) { checkSystemHealth() }
+    LaunchedEffect(Unit) {
+        checkSystemHealth()
+        try {
+            val res = NetworkClient.healthApi.getAppVersion()
+            if (res.isSuccessful && res.body() != null) {
+                val info = res.body()!!
+                if (info.versionCode > BuildConfig.VERSION_CODE && info.downloadUrl.isNotBlank()) {
+                    availableUpdate = info
+                }
+            }
+        } catch (_: Exception) {
+        }
+    }
 
     val token by SessionManager.token.collectAsState()
     val displayName by SessionManager.displayName.collectAsState()
@@ -165,6 +186,31 @@ private fun F4FArenaApp(
         )
     } else null
     val isAdmin = sessionUi?.role == UserRole.ADMIN
+
+    fun loadFeedbackIfAdmin() {
+        if (!isAdmin) return
+        scope.launch {
+            try {
+                val res = NetworkClient.feedbackApi.listFeedback(SessionManager.getBearerToken())
+                if (res.isSuccessful && res.body() != null) {
+                    feedbackItems = res.body()!!.data.map {
+                        FeedbackItemUi(
+                            id = it.id,
+                            authorName = it.authorName,
+                            category = it.category,
+                            message = it.message,
+                            createdAtLabel = formatIsoTimestamp(it.createdAt)
+                        )
+                    }
+                }
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    LaunchedEffect(isAdmin) {
+        if (isAdmin) loadFeedbackIfAdmin()
+    }
 
     LaunchedEffect(authPromptRequired) {
         if (authPromptRequired) {
@@ -258,6 +304,20 @@ private fun F4FArenaApp(
 
     Box(modifier = Modifier.fillMaxSize()) {
         when {
+            !isLoggedIn && !skippedOnboarding -> {
+                OnboardingWelcomeScreen(
+                    onSignUpClick = {
+                        authInitialSignUp = true
+                        showAuthSheet = true
+                    },
+                    onSignInClick = {
+                        authInitialSignUp = false
+                        showAuthSheet = true
+                    },
+                    onBrowseAsGuest = { skippedOnboarding = true }
+                )
+            }
+
             activeTeamBoardMatchId != null -> {
                 val tbSuccess = teamBoardState as? TeamBoardUiState.Success
                 if (tbSuccess != null) {
@@ -405,6 +465,7 @@ private fun F4FArenaApp(
                             },
                             onOpenTeams = { matchId -> activeTeamBoardMatchId = matchId },
                             onOpenCheckIn = { matchId -> activeAttendanceMatchId = matchId },
+                            onEndMatch = { matchId -> matchViewModel.endMatch(matchId) },
                             onSeeAllMatches = { selectedTab = F4FBottomTab.MATCHES },
                             onCreateNewPoll = { showCreatePollModal = true }
                         )
@@ -438,13 +499,40 @@ private fun F4FArenaApp(
                     }
 
                     F4FBottomTab.SYSTEM -> {
-                        SystemHealthScreen(
+                        UpdatesAndFeedbackScreen(
                             health = healthUi,
                             session = sessionUi,
+                            feedbackItems = feedbackItems,
+                            isSubmittingFeedback = isSubmittingFeedback,
+                            onSubmitFeedback = { category, message ->
+                                scope.launch {
+                                    isSubmittingFeedback = true
+                                    try {
+                                        val res = NetworkClient.feedbackApi.submitFeedback(
+                                            SessionManager.getBearerToken(),
+                                            CreateFeedbackRequest(category, message)
+                                        )
+                                        if (res.isSuccessful) {
+                                            snackbarHostState.showSnackbar("Thanks! Feedback sent.")
+                                            loadFeedbackIfAdmin()
+                                        } else {
+                                            snackbarHostState.showSnackbar("Failed to send feedback (HTTP ${res.code()})")
+                                        }
+                                    } catch (e: Exception) {
+                                        snackbarHostState.showSnackbar(e.localizedMessage ?: "Failed to send feedback")
+                                    } finally {
+                                        isSubmittingFeedback = false
+                                    }
+                                }
+                            },
                             onRecheck = { checkSystemHealth() },
-                            onOpenAuth = { showAuthSheet = true },
+                            onOpenAuth = {
+                                authInitialSignUp = false
+                                showAuthSheet = true
+                            },
                             onSignOut = {
                                 SessionManager.logout()
+                                skippedOnboarding = false
                                 matchViewModel.loadMatches()
                             }
                         )
@@ -471,6 +559,8 @@ private fun F4FArenaApp(
 
     if (showAuthSheet) {
         AuthBottomSheet(
+            initialSignUp = authInitialSignUp,
+            rosterPlayers = uiPlayers,
             isLoading = authLoading,
             errorMessage = authError,
             onDismiss = { if (!authLoading) showAuthSheet = false },
@@ -488,11 +578,11 @@ private fun F4FArenaApp(
                     }
                 }
             },
-            onSignUp = { name, user, phone, pin ->
+            onSignUp = { name, user, phone, pin, claimedPlayerId ->
                 scope.launch {
                     authLoading = true
                     authError = null
-                    val res = SessionManager.register(name, user, phone, pin)
+                    val res = SessionManager.register(name, user, phone, pin, claimedPlayerId)
                     authLoading = false
                     if (res.isSuccess) {
                         showAuthSheet = false
@@ -501,6 +591,34 @@ private fun F4FArenaApp(
                     } else {
                         authError = res.exceptionOrNull()?.message ?: "Sign up failed"
                     }
+                }
+            }
+        )
+    }
+
+    if (availableUpdate != null) {
+        val upd = availableUpdate!!
+        AlertDialog(
+            onDismissRequest = { availableUpdate = null },
+            title = { Text("Update Available (v${upd.versionName})") },
+            text = {
+                Text(
+                    if (upd.releaseNotes.isNotBlank()) upd.releaseNotes
+                    else "A newer version of F4F Arena is ready with the latest UI & fixes."
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(upd.downloadUrl))
+                    context.startActivity(intent)
+                    availableUpdate = null
+                }) {
+                    Text("Download Update")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { availableUpdate = null }) {
+                    Text("Later")
                 }
             }
         )
@@ -627,24 +745,99 @@ private fun MatchVoteDetail.toUi(): PollVoteUi = PollVoteUi(
     votedAtLabel = formatIsoTimestamp(votedAt)
 )
 
-private fun com.f4f.arena.data.model.Match.toCardUi(): MatchCardUi = MatchCardUi(
-    id = id,
-    title = title,
-    kickoffTime = kickoffTime ?: "TBD",
-    dateLabel = formatMatchDate(createdAt),
-    venue = venue ?: "Turf Ground",
-    format = format.toUi(),
-    pollOpen = isPollOpen,
-    inCount = inCount,
-    outCount = outCount,
-    currentUserVoteIn = when (myVote) {
-        "IN" -> true
-        "OUT" -> false
-        else -> null
-    },
-    teamsReady = status == MatchStatus.TEAMS_GENERATED || status == MatchStatus.FINALISED,
-    finalised = status == MatchStatus.FINALISED
-)
+private fun com.f4f.arena.data.model.Match.toCardUi(): MatchCardUi {
+    val timeline = computeTimeline(status, kickoffTime, matchDate, updatedAt, createdAt)
+    return MatchCardUi(
+        id = id,
+        title = title,
+        kickoffTime = kickoffTime ?: "TBD",
+        dateLabel = formatMatchDate(matchDate ?: createdAt),
+        timelineLabel = timeline.label,
+        isOngoing = timeline.isOngoing,
+        isEnded = timeline.isEnded,
+        venue = venue ?: "Turf Ground",
+        format = format.toUi(),
+        pollOpen = isPollOpen && !timeline.isEnded,
+        inCount = inCount,
+        outCount = outCount,
+        currentUserVoteIn = when (myVote) {
+            "IN" -> true
+            "OUT" -> false
+            else -> null
+        },
+        teamsReady = status == MatchStatus.TEAMS_GENERATED || status == MatchStatus.FINALISED,
+        finalised = status == MatchStatus.FINALISED
+    )
+}
+
+private data class TimelineState(val label: String, val isOngoing: Boolean, val isEnded: Boolean)
+
+private fun computeTimeline(
+    status: MatchStatus,
+    kickoffTime: String?,
+    matchDate: String?,
+    updatedAt: String?,
+    createdAt: String?
+): TimelineState {
+    if (status == MatchStatus.COMPLETED) {
+        val endedAt = parseIsoDate(matchDate ?: updatedAt ?: createdAt)
+        val rel = endedAt?.let { relativePastTime(it) } ?: "recently"
+        return TimelineState("Match ended $rel", isOngoing = false, isEnded = true)
+    }
+    if (status == MatchStatus.CANCELLED) {
+        return TimelineState("Match cancelled", isOngoing = false, isEnded = true)
+    }
+    val kickoffDate = parseIsoDate(matchDate)
+    if (kickoffDate != null) {
+        val diffMs = System.currentTimeMillis() - kickoffDate.time
+        val threeHoursMs = 3 * 60 * 60 * 1000L
+        if (diffMs in 0..threeHoursMs) {
+            val startedStr = kickoffTime?.let { " · Started at $it" } ?: ""
+            return TimelineState("Ongoing$startedStr", isOngoing = true, isEnded = false)
+        }
+        if (diffMs > threeHoursMs) {
+            return TimelineState("Match ended ${relativePastTime(kickoffDate)}", isOngoing = false, isEnded = true)
+        }
+    }
+    if (!kickoffTime.isNullOrBlank()) {
+        return TimelineState("Starting at $kickoffTime", isOngoing = false, isEnded = false)
+    }
+    return TimelineState(formatMatchDate(createdAt), isOngoing = false, isEnded = false)
+}
+
+private fun parseIsoDate(isoString: String?): Date? {
+    if (isoString.isNullOrBlank()) return null
+    val formats = listOf(
+        "yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'",
+        "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+        "yyyy-MM-dd'T'HH:mm:ss'Z'"
+    )
+    for (pattern in formats) {
+        try {
+            val parser = SimpleDateFormat(pattern, Locale.US).apply {
+                timeZone = TimeZone.getTimeZone("UTC")
+            }
+            return parser.parse(isoString)
+        } catch (_: Exception) {
+        }
+    }
+    return null
+}
+
+private fun relativePastTime(date: Date): String {
+    val diffMs = (System.currentTimeMillis() - date.time).coerceAtLeast(0L)
+    val mins = diffMs / 60_000L
+    val hours = mins / 60L
+    val days = hours / 24L
+    return when {
+        days >= 2 -> "$days days ago"
+        days == 1L -> "yesterday"
+        hours >= 2 -> "$hours hours ago"
+        hours == 1L -> "1 hour ago"
+        mins >= 2 -> "$mins mins ago"
+        else -> "just now"
+    }
+}
 
 private fun bibHex(bibColor: String?): Long = when (bibColor?.lowercase(Locale.US)) {
     "orange" -> 0xFFF97316
