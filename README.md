@@ -145,7 +145,7 @@ cd backend
 go run cmd/api/main.go
 ```
 
-By default, the server listens on `http://localhost:8080` with development credentials (`admin` / `f4f_arena_secret_passphrase`). Override via environment variables or `deployments/.env.example`.
+By default, the server listens on `http://localhost:8080` with development credentials (`admin` / `admin@f4f`). Override via environment variables or `deployments/.env.example`.
 
 Verify the server:
 
