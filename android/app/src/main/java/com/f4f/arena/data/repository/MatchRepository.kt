@@ -61,6 +61,24 @@ class MatchRepository(
             }
         }
 
+    suspend fun deleteMatch(token: String, id: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            try {
+                val bearer = if (token.startsWith("Bearer ")) token else "Bearer $token"
+                val response = matchApi.deleteMatch(bearer, id)
+                if (response.isSuccessful) {
+                    Result.success(Unit)
+                } else if (response.code() == 401) {
+                    com.f4f.arena.data.auth.SessionManager.onUnauthorized()
+                    Result.failure(Exception("Admin sign-in required (HTTP 401)"))
+                } else {
+                    Result.failure(Exception("Failed to delete poll: HTTP ${response.code()}"))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
     suspend fun castVote(token: String, matchId: String, vote: String): Result<Match> =
         withContext(Dispatchers.IO) {
             try {

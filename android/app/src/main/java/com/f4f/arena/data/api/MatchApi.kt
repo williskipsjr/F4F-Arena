@@ -25,6 +25,12 @@ interface MatchApi {
         @Body request: UpdateMatchRequest
     ): Response<MatchResponse>
 
+    @DELETE("api/v1/matches/{id}")
+    suspend fun deleteMatch(
+        @Header("Authorization") bearerToken: String,
+        @Path("id") id: String
+    ): Response<Unit>
+
     @POST("api/v1/matches/{id}/vote")
     suspend fun castVote(
         @Header("Authorization") bearerToken: String,

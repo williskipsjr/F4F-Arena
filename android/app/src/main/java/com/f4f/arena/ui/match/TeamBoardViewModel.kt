@@ -44,7 +44,7 @@ class TeamBoardViewModel(
                 if (existing != null && existing.teams.orEmpty().isNotEmpty()) {
                     _uiState.value = TeamBoardUiState.Success(data = existing)
                 } else {
-                    generateTeams(matchId, subPolicy = null, token = token)
+                    generateTeams(matchId, subPolicy = null, autoFormat = true, token = token)
                 }
             } else {
                 _uiState.value = TeamBoardUiState.Error(
@@ -57,6 +57,8 @@ class TeamBoardViewModel(
     fun generateTeams(
         matchId: String,
         subPolicy: SubstitutePolicy? = null,
+        format: com.f4f.arena.data.model.MatchFormat? = null,
+        autoFormat: Boolean = false,
         token: String = com.f4f.arena.data.auth.SessionManager.getBearerToken()
     ) {
         viewModelScope.launch {
@@ -67,7 +69,13 @@ class TeamBoardViewModel(
                 _uiState.value = TeamBoardUiState.Loading
             }
 
-            val result = repository.generateTeams(token, matchId, subPolicy?.name)
+            val result = repository.generateTeams(
+                token = token,
+                matchId = matchId,
+                subPolicy = subPolicy?.name,
+                format = format?.name,
+                autoFormat = autoFormat
+            )
             result.onSuccess { data ->
                 _uiState.value = TeamBoardUiState.Success(
                     data = data,

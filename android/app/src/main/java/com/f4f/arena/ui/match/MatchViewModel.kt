@@ -167,6 +167,26 @@ class MatchViewModel(
         }
     }
 
+    fun deleteMatch(
+        matchId: String,
+        token: String = SessionManager.getBearerToken()
+    ) {
+        viewModelScope.launch {
+            repository.deleteMatch(token, matchId)
+                .onSuccess {
+                    val current = _uiState.value as? MatchUiState.Success ?: return@onSuccess
+                    _uiState.value = current.copy(
+                        matches = current.matches.filterNot { it.id == matchId },
+                        actionMessage = "Poll deleted"
+                    )
+                }
+                .onFailure { err ->
+                    val current = _uiState.value as? MatchUiState.Success ?: return@onFailure
+                    _uiState.value = current.copy(actionMessage = err.localizedMessage ?: "Failed to delete poll")
+                }
+        }
+    }
+
     private fun computeKickoffIso(kickoffTime: String?): String? {
         val raw = kickoffTime?.trim()?.takeIf { it.isNotEmpty() } ?: return null
         val patterns = listOf("h:mm a", "h:mma", "HH:mm", "H:mm")
