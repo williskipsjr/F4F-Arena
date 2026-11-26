@@ -1,6 +1,7 @@
 package com.f4f.arena.data.api
 
 import com.f4f.arena.data.model.AuthVerifyResponse
+import com.f4f.arena.data.model.ChangePasswordRequest
 import com.f4f.arena.data.model.LoginRequest
 import com.f4f.arena.data.model.LoginResponse
 import com.f4f.arena.data.model.RegisterRequest
@@ -21,6 +22,12 @@ interface AuthApi {
 
     @POST("api/v1/auth/reset-pin")
     suspend fun resetPin(@Body request: ResetPinRequest): Response<ResetPinResponse>
+
+    @POST("api/v1/auth/change-password")
+    suspend fun changePassword(
+        @Header("Authorization") bearerToken: String,
+        @Body request: ChangePasswordRequest
+    ): Response<ResetPinResponse>
 
     @GET("api/v1/auth/verify")
     suspend fun verifyAuth(@Header("Authorization") bearerToken: String): Response<AuthVerifyResponse>

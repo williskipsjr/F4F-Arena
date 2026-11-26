@@ -138,6 +138,7 @@ fun RosterScreen(
             }
         }
     }
+
 }
 
 @Composable
@@ -149,11 +150,13 @@ fun UpdatesAndFeedbackScreen(
     onSubmitFeedback: (category: String, message: String) -> Unit,
     onRecheck: () -> Unit,
     onOpenAuth: () -> Unit,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    onChangePassword: (currentPassword: String, newPassword: String, onResult: (Result<String>) -> Unit) -> Unit = { _, _, _ -> }
 ) {
     val isAdmin = session?.role == UserRole.ADMIN
     var selectedCategory by remember { mutableStateOf("FEATURE") }
     var feedbackText by remember { mutableStateOf("") }
+    var showChangePasswordDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -244,6 +247,13 @@ fun UpdatesAndFeedbackScreen(
                 if (session != null) {
                     Text("${session.name} (@${session.username}) · ${session.role.name}")
                     OutlinedButton(
+                        onClick = { showChangePasswordDialog = true },
+                        shape = RoundedCornerShape(20.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(if (isAdmin) "Change Admin Password" else "Change PIN")
+                    }
+                    OutlinedButton(
                         onClick = onSignOut,
                         shape = RoundedCornerShape(20.dp),
                         modifier = Modifier.fillMaxWidth()
@@ -302,6 +312,81 @@ fun UpdatesAndFeedbackScreen(
                 }
             }
         }
+    }
+
+    if (showChangePasswordDialog && session != null) {
+        var currentPwd by remember { mutableStateOf("") }
+        var newPwd by remember { mutableStateOf("") }
+        var confirmPwd by remember { mutableStateOf("") }
+        var pwdError by remember { mutableStateOf<String?>(null) }
+        var pwdSaving by remember { mutableStateOf(false) }
+        val minLen = if (isAdmin) 6 else 4
+
+        AlertDialog(
+            onDismissRequest = { if (!pwdSaving) showChangePasswordDialog = false },
+            title = { Text(if (isAdmin) "Change Admin Password" else "Change PIN") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = currentPwd,
+                        onValueChange = { currentPwd = it; pwdError = null },
+                        label = { Text("Current Password") },
+                        singleLine = true,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = newPwd,
+                        onValueChange = { newPwd = it; pwdError = null },
+                        label = { Text("New Password (min $minLen chars)") },
+                        singleLine = true,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = confirmPwd,
+                        onValueChange = { confirmPwd = it; pwdError = null },
+                        label = { Text("Confirm New Password") },
+                        singleLine = true,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (pwdError != null) {
+                        Text(pwdError!!, color = Color(0xFFDC2626), fontSize = 12.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !pwdSaving,
+                    onClick = {
+                        when {
+                            currentPwd.isBlank() -> pwdError = "Enter current password"
+                            newPwd.length < minLen -> pwdError = "New password must be at least $minLen characters"
+                            newPwd != confirmPwd -> pwdError = "New passwords do not match"
+                            else -> {
+                                pwdSaving = true
+                                onChangePassword(currentPwd, newPwd) { res ->
+                                    pwdSaving = false
+                                    res.onSuccess {
+                                        showChangePasswordDialog = false
+                                    }.onFailure { err ->
+                                        pwdError = err.localizedMessage ?: "Failed to update password"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ) {
+                    Text(if (pwdSaving) "Saving..." else "Update", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(enabled = !pwdSaving, onClick = { showChangePasswordDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 

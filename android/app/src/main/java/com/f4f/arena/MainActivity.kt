@@ -562,6 +562,15 @@ private fun F4FArenaApp(
                                 SessionManager.logout()
                                 skippedOnboarding = false
                                 matchViewModel.loadMatches()
+                            },
+                            onChangePassword = { currentPwd, newPwd, onResult ->
+                                scope.launch {
+                                    val res = SessionManager.changePassword(currentPwd, newPwd)
+                                    onResult(res)
+                                    res.onSuccess { msg ->
+                                        snackbarHostState.showSnackbar(msg)
+                                    }
+                                }
                             }
                         )
                     }

@@ -22,6 +22,11 @@ data class ResetPinRequest(
     @SerializedName("new_password") val newPassword: String
 )
 
+data class ChangePasswordRequest(
+    @SerializedName("current_password") val currentPassword: String,
+    @SerializedName("new_password") val newPassword: String
+)
+
 data class ResetPinResponse(
     @SerializedName("status") val status: String,
     @SerializedName("message") val message: String

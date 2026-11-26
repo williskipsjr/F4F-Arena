@@ -151,6 +151,30 @@ object SessionManager {
         }
     }
 
+    suspend fun changePassword(
+        currentPassword: String,
+        newPassword: String
+    ): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val response = NetworkClient.authApi.changePassword(
+                bearerToken = getBearerToken(),
+                request = com.f4f.arena.data.model.ChangePasswordRequest(
+                    currentPassword = currentPassword,
+                    newPassword = newPassword
+                )
+            )
+            if (response.isSuccessful) {
+                Result.success(response.body()?.message ?: "Password updated successfully")
+            } else if (response.code() == 401) {
+                Result.failure(Exception("Current password is incorrect"))
+            } else {
+                Result.failure(Exception("Update failed (HTTP ${response.code()})"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     fun requestLoginPrompt() {
         _authPromptRequired.value = true
     }
