@@ -30,7 +30,7 @@ enum class F4FBottomTab(val label: String, val icon: ImageVector) {
     HOME("Home", Icons.Outlined.Home),
     MATCHES("Matches", Icons.Outlined.SportsSoccer),
     ROSTER("Roster", Icons.Outlined.Groups),
-    SYSTEM("System", Icons.Outlined.Tune)
+    SYSTEM("Updates", Icons.Outlined.AutoAwesome)
 }
 
 @Composable

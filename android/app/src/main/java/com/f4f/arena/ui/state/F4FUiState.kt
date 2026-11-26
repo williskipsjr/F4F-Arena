@@ -53,6 +53,9 @@ data class MatchCardUi(
     val title: String,
     val kickoffTime: String,
     val dateLabel: String,
+    val timelineLabel: String,
+    val isOngoing: Boolean = false,
+    val isEnded: Boolean = false,
     val venue: String,
     val format: MatchFormat,
     val pollOpen: Boolean,
@@ -62,6 +65,14 @@ data class MatchCardUi(
     val teamsReady: Boolean,
     val finalised: Boolean,
     val voterInitials: List<String> = emptyList()
+)
+
+data class FeedbackItemUi(
+    val id: String,
+    val authorName: String,
+    val category: String,
+    val message: String,
+    val createdAtLabel: String
 )
 
 data class TeamSlotUi(
