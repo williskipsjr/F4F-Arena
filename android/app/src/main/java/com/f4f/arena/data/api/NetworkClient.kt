@@ -52,4 +52,8 @@ object NetworkClient {
     val teamApi: TeamApi by lazy {
         retrofit.create(TeamApi::class.java)
     }
+
+    val feedbackApi: FeedbackApi by lazy {
+        retrofit.create(FeedbackApi::class.java)
+    }
 }

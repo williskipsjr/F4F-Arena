@@ -112,6 +112,7 @@ data class CreateMatchRequest(
 
 data class UpdateMatchRequest(
     @SerializedName("format") val format: String? = null,
+    @SerializedName("status") val status: String? = null,
     @SerializedName("is_poll_open") val isPollOpen: Boolean? = null
 )
 
