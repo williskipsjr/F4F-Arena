@@ -102,9 +102,9 @@ fun AllMatchesScreen(
                 ) {
                     Column(modifier = Modifier.padding(18.dp)) {
                         Text(
-                            text = "${match.format.label} · ${match.dateLabel} · ${match.kickoffTime}",
+                            text = "${match.format.label} · ${match.timelineLabel}",
                             style = MaterialTheme.typography.labelMedium,
-                            color = F4FColors.TextSecondary
+                            color = if (match.isOngoing) F4FColors.PitchGreen else F4FColors.TextSecondary
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
