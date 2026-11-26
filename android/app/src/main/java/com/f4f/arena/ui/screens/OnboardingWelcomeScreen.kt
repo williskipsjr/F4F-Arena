@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -48,19 +49,14 @@ fun OnboardingWelcomeScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Box(
+                Image(
+                    painter = painterResource(id = R.drawable.f4f_app_logo),
+                    contentDescription = "F4F Arena Logo",
+                    contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .size(92.dp)
+                        .size(96.dp)
                         .clip(RoundedCornerShape(24.dp))
-                        .background(F4FColors.ForestDeep),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_launcher_foreground),
-                        contentDescription = "F4F Arena Logo",
-                        modifier = Modifier.size(86.dp)
-                    )
-                }
+                )
 
                 Text(
                     text = "F4F ARENA",
