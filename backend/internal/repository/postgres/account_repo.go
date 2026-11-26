@@ -48,8 +48,12 @@ func (r *AccountRepository) RegisterPlayer(
 	if trimmedUser == "" && trimmedName != "" {
 		trimmedUser = strings.ToLower(strings.ReplaceAll(trimmedName, " ", "_"))
 	}
+	cleanPhone := normalizePhone(phone)
 	if trimmedName == "" || trimmedUser == "" || len(password) < 4 {
 		return nil, errors.New("display_name, username, and PIN/password (min 4 chars) are required")
+	}
+	if len(cleanPhone) < 10 {
+		return nil, errors.New("valid phone number (at least 10 digits) is required")
 	}
 
 	if !position.IsValid() {
@@ -116,11 +120,7 @@ func (r *AccountRepository) RegisterPlayer(
 		}
 	}
 
-	var phonePtr *string
-	if strings.TrimSpace(phone) != "" {
-		p := strings.TrimSpace(phone)
-		phonePtr = &p
-	}
+	phonePtr := &cleanPhone
 
 	var accountID string
 	err = tx.QueryRow(ctx, `
@@ -220,4 +220,57 @@ func verifyPassword(password, stored string) bool {
 	sum := sha256.Sum256([]byte(parts[0] + ":" + password))
 	computed := hex.EncodeToString(sum[:])
 	return subtle.ConstantTimeCompare([]byte(computed), []byte(parts[1])) == 1
+}
+
+// ResetPinByPhone verifies username + registered phone number and updates the player's PIN/password.
+func (r *AccountRepository) ResetPinByPhone(ctx context.Context, username, phone, newPassword string) error {
+	trimmedUser := strings.ToLower(strings.TrimSpace(username))
+	cleanPhone := normalizePhone(phone)
+	if trimmedUser == "" || len(cleanPhone) < 10 || len(newPassword) < 4 {
+		return errors.New("username, registered phone number (10+ digits), and new PIN (min 4 chars) are required")
+	}
+
+	var accountID string
+	var storedPhone *string
+	err := r.pool.QueryRow(ctx, `
+		SELECT id, phone FROM player_accounts WHERE username = $1
+	`, trimmedUser).Scan(&accountID, &storedPhone)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrInvalidCredentials
+		}
+		return fmt.Errorf("failed looking up account: %w", err)
+	}
+
+	if storedPhone == nil {
+		return errors.New("no phone number registered for this account; contact admin")
+	}
+	storedDigits := normalizePhone(*storedPhone)
+	// Compare last 10 digits so +91 / 0 prefixes match seamlessly
+	if len(storedDigits) < 10 || storedDigits[len(storedDigits)-10:] != cleanPhone[len(cleanPhone)-10:] {
+		return errors.New("phone number does not match this account")
+	}
+
+	newHash, err := hashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("failed hashing new PIN: %w", err)
+	}
+
+	_, err = r.pool.Exec(ctx, `
+		UPDATE player_accounts SET password_hash = $1, updated_at = NOW() WHERE id = $2
+	`, newHash, accountID)
+	if err != nil {
+		return fmt.Errorf("failed updating PIN: %w", err)
+	}
+	return nil
+}
+
+func normalizePhone(raw string) string {
+	var b strings.Builder
+	for _, ch := range raw {
+		if ch >= '0' && ch <= '9' {
+			b.WriteRune(ch)
+		}
+	}
+	return b.String()
 }

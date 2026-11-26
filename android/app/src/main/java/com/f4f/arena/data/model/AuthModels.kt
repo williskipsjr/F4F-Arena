@@ -10,10 +10,21 @@ data class LoginRequest(
 data class RegisterRequest(
     @SerializedName("display_name") val displayName: String,
     @SerializedName("username") val username: String,
-    @SerializedName("phone") val phone: String? = null,
+    @SerializedName("phone") val phone: String,
     @SerializedName("password") val password: String,
     @SerializedName("primary_position") val primaryPosition: String? = null,
     @SerializedName("player_id") val playerId: String? = null
+)
+
+data class ResetPinRequest(
+    @SerializedName("username") val username: String,
+    @SerializedName("phone") val phone: String,
+    @SerializedName("new_password") val newPassword: String
+)
+
+data class ResetPinResponse(
+    @SerializedName("status") val status: String,
+    @SerializedName("message") val message: String
 )
 
 data class LoginResponse(

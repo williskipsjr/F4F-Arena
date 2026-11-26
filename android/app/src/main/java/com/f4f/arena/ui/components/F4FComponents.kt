@@ -1,6 +1,14 @@
 package com.f4f.arena.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,6 +28,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -224,5 +233,79 @@ fun VoterAvatarStack(initials: List<String>, modifier: Modifier = Modifier) {
                 )
             }
         }
+    }
+}
+
+@Composable
+fun FootballLoadingAnimation(
+    message: String = "Loading...",
+    modifier: Modifier = Modifier,
+    tint: Color = F4FColors.PitchGreen,
+    textColor: Color = F4FColors.ForestDeep
+) {
+    val transition = rememberInfiniteTransition(label = "footballLoader")
+    val bounce by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 480, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "footballBounce"
+    )
+    val rotation by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "footballSpin"
+    )
+
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(
+            modifier = Modifier.size(64.dp),
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            // Ground pitch shadow that shrinks as the football bounces up
+            Canvas(
+                modifier = Modifier
+                    .width(34.dp)
+                    .height(8.dp)
+                    .graphicsLayer {
+                        val s = 0.55f + (bounce * 0.45f)
+                        scaleX = s
+                        scaleY = s
+                        alpha = 0.14f + (bounce * 0.18f)
+                    }
+            ) {
+                drawOval(color = F4FColors.ForestDeep)
+            }
+
+            Icon(
+                imageVector = Icons.Outlined.SportsSoccer,
+                contentDescription = "Loading",
+                tint = tint,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(42.dp)
+                    .graphicsLayer {
+                        translationY = (-14f) * (1f - bounce)
+                        rotationZ = rotation
+                    }
+            )
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            text = message,
+            color = textColor,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }

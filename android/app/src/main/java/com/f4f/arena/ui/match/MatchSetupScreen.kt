@@ -22,6 +22,7 @@ import com.f4f.arena.data.model.Match
 import com.f4f.arena.data.model.MatchFormat
 import com.f4f.arena.data.model.MatchStatus
 import com.f4f.arena.data.model.MatchVoteDetail
+import com.f4f.arena.ui.components.FootballLoadingAnimation
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
@@ -100,7 +101,7 @@ fun MatchSetupScreen(
             when (val state = uiState) {
                 is MatchUiState.Loading -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+                        FootballLoadingAnimation(message = "Loading matches...")
                     }
                 }
                 is MatchUiState.Error -> {

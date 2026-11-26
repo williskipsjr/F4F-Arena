@@ -34,6 +34,7 @@ import com.f4f.arena.data.model.Position
 import com.f4f.arena.data.model.SubstitutePolicy
 import com.f4f.arena.ui.components.F4FBottomTab
 import com.f4f.arena.ui.components.FloatingDarkBottomBar
+import com.f4f.arena.ui.components.FootballLoadingAnimation
 import com.f4f.arena.ui.match.*
 import com.f4f.arena.ui.roster.AddPlayerDialog
 import com.f4f.arena.ui.roster.RosterUiState
@@ -405,7 +406,7 @@ private fun F4FArenaApp(
                                 TextButton(onClick = { activeTeamBoardMatchId = null }) { Text("Back") }
                             }
                         } else {
-                            CircularProgressIndicator()
+                            FootballLoadingAnimation(message = "Building teams...")
                         }
                     }
                 }
@@ -433,7 +434,7 @@ private fun F4FArenaApp(
                     )
                 } else {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+                        FootballLoadingAnimation(message = "Loading attendance...")
                     }
                 }
             }
@@ -441,47 +442,59 @@ private fun F4FArenaApp(
             else -> {
                 when (selectedTab) {
                     F4FBottomTab.HOME -> {
-                        HomeDashboardScreen(
-                            session = sessionUi,
-                            searchQuery = searchQuery,
-                            featuredPoll = featuredPoll,
-                            exploreMatches = exploreMatches,
-                            onSearchChange = { searchQuery = it },
-                            onAvatarClick = {
-                                if (isLoggedIn) selectedTab = F4FBottomTab.SYSTEM else showAuthSheet = true
-                            },
-                            onVote = { matchId, voteIn ->
-                                if (!isLoggedIn) {
-                                    showAuthSheet = true
-                                } else {
-                                    matchViewModel.castVote(matchId, if (voteIn) "IN" else "OUT")
-                                }
-                            },
-                            onOpenVoters = { matchId ->
-                                allMatchCards.firstOrNull { it.id == matchId }?.let { openVotersForMatch(it) }
-                            },
-                            onSwitchFormat = { matchId, fmt ->
-                                matchViewModel.updateMatchFormat(matchId, fmt.toApi())
-                            },
-                            onOpenTeams = { matchId -> activeTeamBoardMatchId = matchId },
-                            onOpenCheckIn = { matchId -> activeAttendanceMatchId = matchId },
-                            onEndMatch = { matchId -> matchViewModel.endMatch(matchId) },
-                            onSeeAllMatches = { selectedTab = F4FBottomTab.MATCHES },
-                            onCreateNewPoll = { showCreatePollModal = true }
-                        )
+                        if (matchState is MatchUiState.Loading) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                FootballLoadingAnimation(message = "Loading pitch...")
+                            }
+                        } else {
+                            HomeDashboardScreen(
+                                session = sessionUi,
+                                searchQuery = searchQuery,
+                                featuredPoll = featuredPoll,
+                                exploreMatches = exploreMatches,
+                                onSearchChange = { searchQuery = it },
+                                onAvatarClick = {
+                                    if (isLoggedIn) selectedTab = F4FBottomTab.SYSTEM else showAuthSheet = true
+                                },
+                                onVote = { matchId, voteIn ->
+                                    if (!isLoggedIn) {
+                                        showAuthSheet = true
+                                    } else {
+                                        matchViewModel.castVote(matchId, if (voteIn) "IN" else "OUT")
+                                    }
+                                },
+                                onOpenVoters = { matchId ->
+                                    allMatchCards.firstOrNull { it.id == matchId }?.let { openVotersForMatch(it) }
+                                },
+                                onSwitchFormat = { matchId, fmt ->
+                                    matchViewModel.updateMatchFormat(matchId, fmt.toApi())
+                                },
+                                onOpenTeams = { matchId -> activeTeamBoardMatchId = matchId },
+                                onOpenCheckIn = { matchId -> activeAttendanceMatchId = matchId },
+                                onEndMatch = { matchId -> matchViewModel.endMatch(matchId) },
+                                onSeeAllMatches = { selectedTab = F4FBottomTab.MATCHES },
+                                onCreateNewPoll = { showCreatePollModal = true }
+                            )
+                        }
                     }
 
                     F4FBottomTab.MATCHES -> {
-                        AllMatchesScreen(
-                            matches = allMatchCards,
-                            isAdmin = isAdmin,
-                            onBack = { selectedTab = F4FBottomTab.HOME },
-                            onOpenVoters = { matchId ->
-                                allMatchCards.firstOrNull { it.id == matchId }?.let { openVotersForMatch(it) }
-                            },
-                            onOpenTeams = { matchId -> activeTeamBoardMatchId = matchId },
-                            onOpenCheckIn = { matchId -> activeAttendanceMatchId = matchId }
-                        )
+                        if (matchState is MatchUiState.Loading) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                FootballLoadingAnimation(message = "Loading matches...")
+                            }
+                        } else {
+                            AllMatchesScreen(
+                                matches = allMatchCards,
+                                isAdmin = isAdmin,
+                                onBack = { selectedTab = F4FBottomTab.HOME },
+                                onOpenVoters = { matchId ->
+                                    allMatchCards.firstOrNull { it.id == matchId }?.let { openVotersForMatch(it) }
+                                },
+                                onOpenTeams = { matchId -> activeTeamBoardMatchId = matchId },
+                                onOpenCheckIn = { matchId -> activeAttendanceMatchId = matchId }
+                            )
+                        }
                     }
 
                     F4FBottomTab.ROSTER -> {
@@ -560,7 +573,6 @@ private fun F4FArenaApp(
     if (showAuthSheet) {
         AuthBottomSheet(
             initialSignUp = authInitialSignUp,
-            rosterPlayers = uiPlayers,
             isLoading = authLoading,
             errorMessage = authError,
             onDismiss = { if (!authLoading) showAuthSheet = false },
@@ -578,11 +590,11 @@ private fun F4FArenaApp(
                     }
                 }
             },
-            onSignUp = { name, user, phone, pin, claimedPlayerId ->
+            onSignUp = { name, user, phone, pin ->
                 scope.launch {
                     authLoading = true
                     authError = null
-                    val res = SessionManager.register(name, user, phone, pin, claimedPlayerId)
+                    val res = SessionManager.register(name, user, phone, pin)
                     authLoading = false
                     if (res.isSuccess) {
                         showAuthSheet = false
@@ -590,6 +602,21 @@ private fun F4FArenaApp(
                         rosterViewModel.loadRoster()
                     } else {
                         authError = res.exceptionOrNull()?.message ?: "Sign up failed"
+                    }
+                }
+            },
+            onResetPin = { user, phone, newPin ->
+                scope.launch {
+                    authLoading = true
+                    authError = null
+                    val res = SessionManager.resetPin(user, phone, newPin)
+                    authLoading = false
+                    if (res.isSuccess) {
+                        authInitialSignUp = false
+                        showAuthSheet = false
+                        snackbarHostState.showSnackbar("PIN reset! Please sign in with your new PIN.")
+                    } else {
+                        authError = res.exceptionOrNull()?.message ?: "PIN reset failed"
                     }
                 }
             }

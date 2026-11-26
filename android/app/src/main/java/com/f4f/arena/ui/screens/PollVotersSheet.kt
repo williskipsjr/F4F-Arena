@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.f4f.arena.ui.components.FootballLoadingAnimation
 import com.f4f.arena.ui.state.PollVoteUi
 import com.f4f.arena.ui.theme.F4FColors
 
@@ -66,7 +67,7 @@ fun PollVotersSheet(
                         .height(160.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = F4FColors.PitchGreen)
+                    FootballLoadingAnimation(message = "Loading voters...")
                 }
             } else {
                 LazyColumn(

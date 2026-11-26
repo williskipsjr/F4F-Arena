@@ -6,6 +6,7 @@ import com.f4f.arena.data.api.NetworkClient
 import com.f4f.arena.data.model.LoginRequest
 import com.f4f.arena.data.model.LoginResponse
 import com.f4f.arena.data.model.RegisterRequest
+import com.f4f.arena.data.model.ResetPinRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -99,7 +100,7 @@ object SessionManager {
     suspend fun register(
         displayName: String,
         username: String,
-        phone: String?,
+        phone: String,
         password: String,
         playerId: String? = null
     ): Result<Unit> = withContext(Dispatchers.IO) {
@@ -109,7 +110,7 @@ object SessionManager {
                 RegisterRequest(
                     displayName = displayName.trim(),
                     username = trimmedUser,
-                    phone = phone?.trim()?.ifBlank { null },
+                    phone = phone.trim(),
                     password = password,
                     playerId = playerId
                 )
@@ -121,6 +122,29 @@ object SessionManager {
                 Result.failure(Exception("Username already taken. Try signing in instead."))
             } else {
                 Result.failure(Exception("Sign up failed (HTTP ${response.code()})"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun resetPin(
+        username: String,
+        phone: String,
+        newPin: String
+    ): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val response = NetworkClient.authApi.resetPin(
+                ResetPinRequest(
+                    username = username.trim(),
+                    phone = phone.trim(),
+                    newPassword = newPin
+                )
+            )
+            if (response.isSuccessful) {
+                Result.success(response.body()?.message ?: "PIN updated successfully")
+            } else {
+                Result.failure(Exception("Reset failed (HTTP ${response.code()}): check username & phone"))
             }
         } catch (e: Exception) {
             Result.failure(e)
