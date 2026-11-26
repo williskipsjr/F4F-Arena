@@ -560,7 +560,6 @@ private fun F4FArenaApp(
     if (showAuthSheet) {
         AuthBottomSheet(
             initialSignUp = authInitialSignUp,
-            rosterPlayers = uiPlayers,
             isLoading = authLoading,
             errorMessage = authError,
             onDismiss = { if (!authLoading) showAuthSheet = false },
@@ -578,11 +577,11 @@ private fun F4FArenaApp(
                     }
                 }
             },
-            onSignUp = { name, user, phone, pin, claimedPlayerId ->
+            onSignUp = { name, user, phone, pin ->
                 scope.launch {
                     authLoading = true
                     authError = null
-                    val res = SessionManager.register(name, user, phone, pin, claimedPlayerId)
+                    val res = SessionManager.register(name, user, phone, pin)
                     authLoading = false
                     if (res.isSuccess) {
                         showAuthSheet = false
@@ -590,6 +589,21 @@ private fun F4FArenaApp(
                         rosterViewModel.loadRoster()
                     } else {
                         authError = res.exceptionOrNull()?.message ?: "Sign up failed"
+                    }
+                }
+            },
+            onResetPin = { user, phone, newPin ->
+                scope.launch {
+                    authLoading = true
+                    authError = null
+                    val res = SessionManager.resetPin(user, phone, newPin)
+                    authLoading = false
+                    if (res.isSuccess) {
+                        authInitialSignUp = false
+                        showAuthSheet = false
+                        snackbarHostState.showSnackbar("PIN reset! Please sign in with your new PIN.")
+                    } else {
+                        authError = res.exceptionOrNull()?.message ?: "PIN reset failed"
                     }
                 }
             }
