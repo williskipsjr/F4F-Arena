@@ -359,6 +359,19 @@ private fun F4FArenaApp(
                         onPolicyChange = { newPolicy ->
                             teamBoardViewModel.generateTeams(activeTeamBoardMatchId!!, newPolicy.toApi())
                         },
+                        onFormatChange = { newFormat ->
+                            teamBoardViewModel.generateTeams(
+                                matchId = activeTeamBoardMatchId!!,
+                                format = newFormat.toApi(),
+                                autoFormat = false
+                            )
+                        },
+                        onAutoFormat = {
+                            teamBoardViewModel.generateTeams(
+                                matchId = activeTeamBoardMatchId!!,
+                                autoFormat = true
+                            )
+                        },
                         onReshuffle = {
                             teamBoardViewModel.generateTeams(activeTeamBoardMatchId!!)
                         },
@@ -472,6 +485,7 @@ private fun F4FArenaApp(
                                 onOpenTeams = { matchId -> activeTeamBoardMatchId = matchId },
                                 onOpenCheckIn = { matchId -> activeAttendanceMatchId = matchId },
                                 onEndMatch = { matchId -> matchViewModel.endMatch(matchId) },
+                                onDeleteMatch = { matchId -> matchViewModel.deleteMatch(matchId) },
                                 onSeeAllMatches = { selectedTab = F4FBottomTab.MATCHES },
                                 onCreateNewPoll = { showCreatePollModal = true }
                             )
@@ -492,7 +506,8 @@ private fun F4FArenaApp(
                                     allMatchCards.firstOrNull { it.id == matchId }?.let { openVotersForMatch(it) }
                                 },
                                 onOpenTeams = { matchId -> activeTeamBoardMatchId = matchId },
-                                onOpenCheckIn = { matchId -> activeAttendanceMatchId = matchId }
+                                onOpenCheckIn = { matchId -> activeAttendanceMatchId = matchId },
+                                onDeleteMatch = { matchId -> matchViewModel.deleteMatch(matchId) }
                             )
                         }
                     }
@@ -735,15 +750,23 @@ private fun Position.toUi(): PlayerPosition = when (this) {
 }
 
 private fun ApiMatchFormat.toUi(): MatchFormat = when (this) {
+    ApiMatchFormat.FIVE_A_SIDE -> MatchFormat.FIVE_A_SIDE
     ApiMatchFormat.SIX_A_SIDE -> MatchFormat.SIX_A_SIDE
     ApiMatchFormat.SEVEN_A_SIDE -> MatchFormat.SEVEN_A_SIDE
+    ApiMatchFormat.EIGHT_A_SIDE -> MatchFormat.EIGHT_A_SIDE
     ApiMatchFormat.NINE_A_SIDE -> MatchFormat.NINE_A_SIDE
+    ApiMatchFormat.TEN_A_SIDE -> MatchFormat.TEN_A_SIDE
+    ApiMatchFormat.ELEVEN_A_SIDE -> MatchFormat.ELEVEN_A_SIDE
 }
 
 private fun MatchFormat.toApi(): ApiMatchFormat = when (this) {
+    MatchFormat.FIVE_A_SIDE -> ApiMatchFormat.FIVE_A_SIDE
     MatchFormat.SIX_A_SIDE -> ApiMatchFormat.SIX_A_SIDE
     MatchFormat.SEVEN_A_SIDE -> ApiMatchFormat.SEVEN_A_SIDE
+    MatchFormat.EIGHT_A_SIDE -> ApiMatchFormat.EIGHT_A_SIDE
     MatchFormat.NINE_A_SIDE -> ApiMatchFormat.NINE_A_SIDE
+    MatchFormat.TEN_A_SIDE -> ApiMatchFormat.TEN_A_SIDE
+    MatchFormat.ELEVEN_A_SIDE -> ApiMatchFormat.ELEVEN_A_SIDE
 }
 
 private fun SubstitutePolicy.toUi(): TeamPolicy = when (this) {

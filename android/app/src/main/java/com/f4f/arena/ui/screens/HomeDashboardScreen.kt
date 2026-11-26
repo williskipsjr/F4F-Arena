@@ -3,15 +3,17 @@ package com.f4f.arena.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.f4f.arena.ui.components.GlassSearchBar
+import com.f4f.arena.ui.components.PollAdminOverflowMenu
 import com.f4f.arena.ui.components.PrimaryLimePillButton
 import com.f4f.arena.ui.components.VoterAvatarStack
 import com.f4f.arena.ui.state.*
@@ -40,6 +43,7 @@ fun HomeDashboardScreen(
     onOpenTeams: (matchId: String) -> Unit,
     onOpenCheckIn: (matchId: String) -> Unit,
     onEndMatch: (matchId: String) -> Unit = {},
+    onDeleteMatch: (matchId: String) -> Unit = {},
     onSeeAllMatches: () -> Unit,
     onCreateNewPoll: () -> Unit
 ) {
@@ -140,6 +144,8 @@ fun HomeDashboardScreen(
                         onOpenVoters = { onOpenVoters(featuredPoll.id) },
                         onSwitchFormat = { fmt -> onSwitchFormat(featuredPoll.id, fmt) },
                         onOpenTeams = { onOpenTeams(featuredPoll.id) },
+                        onEndMatch = { onEndMatch(featuredPoll.id) },
+                        onDeleteMatch = { onDeleteMatch(featuredPoll.id) },
                         modifier = Modifier.padding(horizontal = 20.dp)
                     )
                 }
@@ -174,6 +180,7 @@ fun HomeDashboardScreen(
                     onViewTeams = { onOpenTeams(match.id) },
                     onCheckIn = { onOpenCheckIn(match.id) },
                     onEndMatch = { onEndMatch(match.id) },
+                    onDeleteMatch = { onDeleteMatch(match.id) },
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
                 )
             }
@@ -205,6 +212,8 @@ private fun FeaturedPollCard(
     onOpenVoters: () -> Unit,
     onSwitchFormat: (MatchFormat) -> Unit,
     onOpenTeams: () -> Unit,
+    onEndMatch: () -> Unit,
+    onDeleteMatch: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -225,12 +234,22 @@ private fun FeaturedPollCard(
                     style = MaterialTheme.typography.labelMedium,
                     color = F4FColors.ForestMid
                 )
-                Text(
-                    text = "Who Voted",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = F4FColors.TextSecondary,
-                    modifier = Modifier.clickable(onClick = onOpenVoters)
-                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "Who Voted",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = F4FColors.TextSecondary,
+                        modifier = Modifier.clickable(onClick = onOpenVoters)
+                    )
+                    if (isAdmin) {
+                        PollAdminOverflowMenu(
+                            matchTitle = poll.title,
+                            isEnded = poll.isEnded,
+                            onEndMatch = onEndMatch,
+                            onDeleteMatch = onDeleteMatch
+                        )
+                    }
+                }
             }
 
             Spacer(Modifier.height(6.dp))
@@ -308,18 +327,20 @@ private fun FeaturedPollCard(
 
             if (isAdmin) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     MatchFormat.entries.forEach { fmt ->
                         val active = poll.format == fmt
                         Box(
                             modifier = Modifier
-                                .weight(1f)
+                                .widthIn(min = 84.dp)
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(if (active) F4FColors.ForestDeep else F4FColors.SurfaceMuted)
                                 .clickable { onSwitchFormat(fmt) }
-                                .padding(vertical = 8.dp, horizontal = 8.dp),
+                                .padding(vertical = 8.dp, horizontal = 10.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -378,6 +399,7 @@ private fun ExploreMatchCard(
     onViewTeams: () -> Unit,
     onCheckIn: () -> Unit,
     onEndMatch: () -> Unit,
+    onDeleteMatch: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -423,6 +445,14 @@ private fun ExploreMatchCard(
                         style = MaterialTheme.typography.labelMedium,
                         color = F4FColors.ForestMid
                     )
+                    if (isAdmin) {
+                        PollAdminOverflowMenu(
+                            matchTitle = match.title,
+                            isEnded = match.isEnded,
+                            onEndMatch = onEndMatch,
+                            onDeleteMatch = onDeleteMatch
+                        )
+                    }
                 }
             }
             Spacer(Modifier.height(4.dp))

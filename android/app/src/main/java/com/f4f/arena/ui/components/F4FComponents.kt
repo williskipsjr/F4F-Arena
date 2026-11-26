@@ -19,8 +19,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -306,6 +305,79 @@ fun FootballLoadingAnimation(
             color = textColor,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+@Composable
+fun PollAdminOverflowMenu(
+    matchTitle: String,
+    isEnded: Boolean,
+    onEndMatch: (() -> Unit)? = null,
+    onDeleteMatch: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
+
+    Box {
+        IconButton(
+            onClick = { expanded = true },
+            modifier = Modifier.size(28.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.MoreVert,
+                contentDescription = "Poll options",
+                tint = F4FColors.TextSecondary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            if (!isEnded && onEndMatch != null) {
+                DropdownMenuItem(
+                    text = { Text("Mark Match Ended") },
+                    leadingIcon = { Icon(Icons.Outlined.Flag, contentDescription = null) },
+                    onClick = {
+                        expanded = false
+                        onEndMatch()
+                    }
+                )
+            }
+            DropdownMenuItem(
+                text = { Text("Delete Poll", color = Color(0xFFDC2626)) },
+                leadingIcon = {
+                    Icon(Icons.Outlined.DeleteOutline, contentDescription = null, tint = Color(0xFFDC2626))
+                },
+                onClick = {
+                    expanded = false
+                    confirmDelete = true
+                }
+            )
+        }
+    }
+
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Delete Poll?") },
+            text = { Text("Remove \"$matchTitle\" and all its votes? This cannot be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmDelete = false
+                        onDeleteMatch()
+                    }
+                ) {
+                    Text("Delete", color = Color(0xFFDC2626), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) {
+                    Text("Cancel")
+                }
+            }
         )
     }
 }

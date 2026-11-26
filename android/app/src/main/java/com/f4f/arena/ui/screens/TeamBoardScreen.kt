@@ -2,6 +2,7 @@ package com.f4f.arena.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -39,6 +40,8 @@ fun TeamBoardScreen(
     swapSourcePlayerId: String?,
     onBack: () -> Unit,
     onPolicyChange: (TeamPolicy) -> Unit,
+    onFormatChange: (MatchFormat) -> Unit = {},
+    onAutoFormat: () -> Unit = {},
     onReshuffle: () -> Unit,
     onTapPlayerForSwap: (String) -> Unit,
     onMovePlayer: (playerId: String, targetTeamId: String?) -> Unit,
@@ -107,6 +110,53 @@ fun TeamBoardScreen(
 
                         if (isAdmin && !isFinalised) {
                             Spacer(Modifier.height(12.dp))
+                            Text(
+                                text = "Format (Auto picks even teams)",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = F4FColors.TextSecondary
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(F4FColors.PitchLime.copy(alpha = 0.22f))
+                                        .clickable(enabled = !isGenerating) { onAutoFormat() }
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        "Auto",
+                                        color = F4FColors.ForestDeep,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                                MatchFormat.entries.forEach { fmt ->
+                                    val selected = fmt == format
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(if (selected) F4FColors.ForestDeep else F4FColors.SurfaceMuted)
+                                            .clickable(enabled = !isGenerating) { onFormatChange(fmt) }
+                                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            "${fmt.size}v${fmt.size}",
+                                            color = if (selected) F4FColors.PitchLime else F4FColors.TextPrimary,
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.height(10.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 listOf(
                                     TeamPolicy.STRICT_SUBS to "Strict Subs",
