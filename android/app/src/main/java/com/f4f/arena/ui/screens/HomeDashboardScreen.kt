@@ -39,6 +39,7 @@ fun HomeDashboardScreen(
     onSwitchFormat: (matchId: String, format: MatchFormat) -> Unit,
     onOpenTeams: (matchId: String) -> Unit,
     onOpenCheckIn: (matchId: String) -> Unit,
+    onEndMatch: (matchId: String) -> Unit = {},
     onSeeAllMatches: () -> Unit,
     onCreateNewPoll: () -> Unit
 ) {
@@ -172,6 +173,7 @@ fun HomeDashboardScreen(
                     isAdmin = isAdmin,
                     onViewTeams = { onOpenTeams(match.id) },
                     onCheckIn = { onOpenCheckIn(match.id) },
+                    onEndMatch = { onEndMatch(match.id) },
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
                 )
             }
@@ -185,7 +187,7 @@ fun HomeDashboardScreen(
                 shape = RoundedCornerShape(24.dp),
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = 20.dp, bottom = 96.dp)
+                    .padding(end = 20.dp, bottom = 108.dp)
             ) {
                 Icon(Icons.Outlined.Add, contentDescription = null)
                 Spacer(Modifier.width(6.dp))
@@ -259,9 +261,10 @@ private fun FeaturedPollCard(
             Spacer(Modifier.height(10.dp))
 
             Text(
-                text = "${poll.kickoffTime} · ${poll.venue} · ${poll.format.label}",
+                text = "${poll.timelineLabel} · ${poll.venue} · ${poll.format.label}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = F4FColors.TextSecondary
+                color = if (poll.isOngoing) F4FColors.PitchGreen else F4FColors.TextSecondary,
+                fontWeight = if (poll.isOngoing) FontWeight.SemiBold else FontWeight.Normal
             )
 
             Spacer(Modifier.height(16.dp))
@@ -374,6 +377,7 @@ private fun ExploreMatchCard(
     isAdmin: Boolean,
     onViewTeams: () -> Unit,
     onCheckIn: () -> Unit,
+    onEndMatch: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -394,20 +398,41 @@ private fun ExploreMatchCard(
                     style = MaterialTheme.typography.titleMedium,
                     color = F4FColors.TextPrimary
                 )
-                Text(
-                    text = match.format.label,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = F4FColors.ForestMid
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (match.isOngoing) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFFDCFCE7))
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text("ONGOING", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = F4FColors.ForestDeep)
+                        }
+                    } else if (match.isEnded) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(F4FColors.SurfaceMuted)
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text("ENDED", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = F4FColors.TextMuted)
+                        }
+                    }
+                    Text(
+                        text = match.format.label,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = F4FColors.ForestMid
+                    )
+                }
             }
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "${match.kickoffTime} · ${match.inCount} IN · ${if (match.finalised) "Finalised" else if (match.teamsReady) "Teams Ready" else "Draft"}",
+                text = "${match.timelineLabel} · ${match.inCount} IN · ${if (match.isEnded) "Completed" else if (match.finalised) "Finalised" else if (match.teamsReady) "Teams Ready" else "Draft"}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = F4FColors.TextSecondary
+                color = if (match.isOngoing) F4FColors.ForestMid else F4FColors.TextSecondary
             )
             Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
                     onClick = onViewTeams,
                     shape = RoundedCornerShape(20.dp),
@@ -415,7 +440,7 @@ private fun ExploreMatchCard(
                 ) {
                     Text("View Teams", fontWeight = FontWeight.SemiBold, color = F4FColors.TextPrimary)
                 }
-                if (isAdmin) {
+                if (isAdmin && !match.isEnded) {
                     Button(
                         onClick = onCheckIn,
                         shape = RoundedCornerShape(20.dp),
@@ -426,6 +451,14 @@ private fun ExploreMatchCard(
                         modifier = Modifier.weight(1f)
                     ) {
                         Text("Check In", fontWeight = FontWeight.SemiBold)
+                    }
+                    if (match.teamsReady || match.isOngoing) {
+                        OutlinedButton(
+                            onClick = onEndMatch,
+                            shape = RoundedCornerShape(20.dp)
+                        ) {
+                            Text("End", fontWeight = FontWeight.SemiBold, color = F4FColors.TextSecondary)
+                        }
                     }
                 }
             }

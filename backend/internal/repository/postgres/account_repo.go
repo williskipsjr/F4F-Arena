@@ -41,11 +41,15 @@ func (r *AccountRepository) RegisterPlayer(
 	ctx context.Context,
 	displayName, username, phone, password string,
 	position domain.Position,
+	claimedPlayerID *string,
 ) (*PlayerAccountInfo, error) {
 	trimmedName := strings.TrimSpace(displayName)
 	trimmedUser := strings.ToLower(strings.TrimSpace(username))
+	if trimmedUser == "" && trimmedName != "" {
+		trimmedUser = strings.ToLower(strings.ReplaceAll(trimmedName, " ", "_"))
+	}
 	if trimmedName == "" || trimmedUser == "" || len(password) < 4 {
-		return nil, errors.New("display_name, username, and password (min 4 chars) are required")
+		return nil, errors.New("display_name, username, and PIN/password (min 4 chars) are required")
 	}
 
 	if !position.IsValid() {
@@ -72,28 +76,44 @@ func (r *AccountRepository) RegisterPlayer(
 		return nil, fmt.Errorf("failed checking username: %w", err)
 	}
 
-	// Link to an unlinked seeded player with the same display_name if present, otherwise create a new player
+	// Link to claimed player_id if provided & unclaimed, else match display_name, else create new player
 	var playerID string
 	now := time.Now().UTC()
-	err = tx.QueryRow(ctx, `
-		SELECT p.id
-		FROM players p
-		LEFT JOIN player_accounts pa ON pa.player_id = p.id
-		WHERE LOWER(p.display_name) = LOWER($1) AND pa.id IS NULL
-		LIMIT 1
-	`, trimmedName).Scan(&playerID)
-
-	if errors.Is(err, pgx.ErrNoRows) {
-		err = tx.QueryRow(ctx, `
-			INSERT INTO players (display_name, primary_position, is_active, created_at, updated_at)
-			VALUES ($1, $2, true, $3, $3)
-			RETURNING id
-		`, trimmedName, string(position), now).Scan(&playerID)
-		if err != nil {
-			return nil, fmt.Errorf("failed creating player profile: %w", err)
+	if claimedPlayerID != nil && strings.TrimSpace(*claimedPlayerID) != "" {
+		cid := strings.TrimSpace(*claimedPlayerID)
+		var existingAcc string
+		err = tx.QueryRow(ctx, "SELECT id FROM player_accounts WHERE player_id = $1", cid).Scan(&existingAcc)
+		if err == nil {
+			return nil, errors.New("this player profile has already been claimed — please sign in")
 		}
-	} else if err != nil {
-		return nil, fmt.Errorf("failed looking up player profile: %w", err)
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("failed checking claimed player: %w", err)
+		}
+		err = tx.QueryRow(ctx, "SELECT id, display_name FROM players WHERE id = $1", cid).Scan(&playerID, &trimmedName)
+		if err != nil {
+			return nil, fmt.Errorf("selected player not found")
+		}
+	} else {
+		err = tx.QueryRow(ctx, `
+			SELECT p.id
+			FROM players p
+			LEFT JOIN player_accounts pa ON pa.player_id = p.id
+			WHERE LOWER(p.display_name) = LOWER($1) AND pa.id IS NULL
+			LIMIT 1
+		`, trimmedName).Scan(&playerID)
+
+		if errors.Is(err, pgx.ErrNoRows) {
+			err = tx.QueryRow(ctx, `
+				INSERT INTO players (display_name, primary_position, is_active, created_at, updated_at)
+				VALUES ($1, $2, true, $3, $3)
+				RETURNING id
+			`, trimmedName, string(position), now).Scan(&playerID)
+			if err != nil {
+				return nil, fmt.Errorf("failed creating player profile: %w", err)
+			}
+		} else if err != nil {
+			return nil, fmt.Errorf("failed looking up player profile: %w", err)
+		}
 	}
 
 	var phonePtr *string

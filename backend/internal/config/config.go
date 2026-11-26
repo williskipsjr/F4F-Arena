@@ -7,13 +7,17 @@ import (
 )
 
 type Config struct {
-	ServerPort       string
-	ServerEnv        string
-	DatabaseURL      string
-	AdminUsername    string
-	AdminPassword    string
-	JWTSecret        string
-	TokenExpiryHours time.Duration
+	ServerPort           string
+	ServerEnv            string
+	DatabaseURL          string
+	AdminUsername        string
+	AdminPassword        string
+	JWTSecret            string
+	TokenExpiryHours     time.Duration
+	LatestAppVersionCode int
+	LatestAppVersionName string
+	AppDownloadURL       string
+	AppReleaseNotes      string
 }
 
 func Load() *Config {
@@ -39,14 +43,23 @@ func Load() *Config {
 		adminPassphrase = getEnv("ADMIN_PASSWORD_HASH", "f4f_arena_secret_passphrase")
 	}
 
+	latestVersionCode, err := strconv.Atoi(getEnv("APP_LATEST_VERSION_CODE", "1"))
+	if err != nil || latestVersionCode < 1 {
+		latestVersionCode = 1
+	}
+
 	return &Config{
-		ServerPort:       getEnv("SERVER_PORT", "8080"),
-		ServerEnv:        getEnv("SERVER_ENV", "development"),
-		DatabaseURL:      dbURL,
-		AdminUsername:    getEnv("ADMIN_USERNAME", "admin"),
-		AdminPassword:    adminPassphrase,
-		JWTSecret:        getEnv("JWT_SECRET", "f4f_arena_dev_jwt_secret_key_32bytes_min!"),
-		TokenExpiryHours: time.Duration(expiryHours) * time.Hour,
+		ServerPort:           getEnv("SERVER_PORT", "8080"),
+		ServerEnv:            getEnv("SERVER_ENV", "development"),
+		DatabaseURL:          dbURL,
+		AdminUsername:        getEnv("ADMIN_USERNAME", "admin"),
+		AdminPassword:        adminPassphrase,
+		JWTSecret:            getEnv("JWT_SECRET", "f4f_arena_dev_jwt_secret_key_32bytes_min!"),
+		TokenExpiryHours:     time.Duration(expiryHours) * time.Hour,
+		LatestAppVersionCode: latestVersionCode,
+		LatestAppVersionName: getEnv("APP_LATEST_VERSION_NAME", "1.0.0"),
+		AppDownloadURL:       getEnv("APP_DOWNLOAD_URL", ""),
+		AppReleaseNotes:      getEnv("APP_RELEASE_NOTES", ""),
 	}
 }
 

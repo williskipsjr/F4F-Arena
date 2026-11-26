@@ -22,6 +22,7 @@ type RegisterRequest struct {
 	Phone           string           `json:"phone,omitempty"`
 	Password        string           `json:"password"`
 	PrimaryPosition *domain.Position `json:"primary_position,omitempty"`
+	PlayerID        *string          `json:"player_id,omitempty"`
 }
 
 type LoginResponse struct {
@@ -70,7 +71,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		pos = *req.PrimaryPosition
 	}
 
-	info, err := h.accountRepo.RegisterPlayer(r.Context(), req.DisplayName, req.Username, req.Phone, req.Password, pos)
+	info, err := h.accountRepo.RegisterPlayer(r.Context(), req.DisplayName, req.Username, req.Phone, req.Password, pos, req.PlayerID)
 	if err != nil {
 		if errors.Is(err, postgres.ErrUsernameTaken) {
 			writeError(w, http.StatusConflict, "USERNAME_TAKEN", "Username is already registered")
