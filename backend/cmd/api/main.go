@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -49,9 +50,12 @@ func main() {
 	var playerHandler *handler.PlayerHandler
 	var matchHandler *handler.MatchHandler
 	var teamHandler *handler.TeamHandler
+	var feedbackHandler *handler.FeedbackHandler
 	var accountRepo *postgres.AccountRepository
 	if db != nil && db.Pool != nil {
 		accountRepo = postgres.NewAccountRepository(db.Pool)
+		feedbackRepo := postgres.NewFeedbackRepository(db.Pool)
+		feedbackHandler = handler.NewFeedbackHandler(feedbackRepo)
 
 		playerRepo := postgres.NewPlayerRepository(db.Pool)
 		playerService := service.NewPlayerService(playerRepo)
@@ -92,6 +96,16 @@ func main() {
 
 	// Public Routes
 	r.Get("/health", healthHandler.ServeHTTP)
+	r.Get("/api/v1/app/version", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"version_code":  cfg.LatestAppVersionCode,
+			"version_name":  cfg.LatestAppVersionName,
+			"download_url":  cfg.AppDownloadURL,
+			"release_notes": cfg.AppReleaseNotes,
+		})
+	})
 	r.Post("/api/v1/auth/login", authHandler.Login)
 	r.Post("/api/v1/auth/register", authHandler.Register)
 	if playerHandler != nil {
@@ -121,10 +135,16 @@ func main() {
 		if matchHandler != nil {
 			authed.Post("/api/v1/matches/{id}/vote", matchHandler.CastVote)
 		}
+		if feedbackHandler != nil {
+			authed.Post("/api/v1/feedback", feedbackHandler.Create)
+		}
 
-		// Admin-only Mutations
+		// Admin-only Mutations & Diagnostics
 		authed.Group(func(admin chi.Router) {
 			admin.Use(tokenService.RequireAdmin)
+			if feedbackHandler != nil {
+				admin.Get("/api/v1/feedback", feedbackHandler.List)
+			}
 			if playerHandler != nil {
 				admin.Post("/api/v1/players", playerHandler.Create)
 				admin.Patch("/api/v1/players/{id}", playerHandler.Update)
