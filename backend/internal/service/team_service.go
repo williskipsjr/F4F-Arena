@@ -17,8 +17,15 @@ type TeamStore interface {
 	FinaliseMatch(ctx context.Context, matchID string) error
 }
 
+type GenerateTeamsOptions struct {
+	SubPolicy  *domain.SubstitutePolicy
+	Format     *domain.MatchFormat
+	AutoFormat bool
+}
+
 type TeamService interface {
 	GenerateTeams(ctx context.Context, matchID string, subPolicyOverride *domain.SubstitutePolicy) (*domain.MatchTeamsResponse, error)
+	GenerateTeamsWithOptions(ctx context.Context, matchID string, opts GenerateTeamsOptions) (*domain.MatchTeamsResponse, error)
 	GetTeams(ctx context.Context, matchID string) (*domain.MatchTeamsResponse, error)
 	SwapPlayers(ctx context.Context, matchID string, input domain.SwapPlayersInput) (*domain.MatchTeamsResponse, error)
 	MovePlayer(ctx context.Context, matchID string, input domain.MovePlayerInput) (*domain.MatchTeamsResponse, error)
@@ -41,6 +48,12 @@ func NewTeamService(matchRepo MatchStore, teamRepo TeamStore) TeamService {
 }
 
 func (s *teamService) GenerateTeams(ctx context.Context, matchID string, subPolicyOverride *domain.SubstitutePolicy) (*domain.MatchTeamsResponse, error) {
+	return s.GenerateTeamsWithOptions(ctx, matchID, GenerateTeamsOptions{
+		SubPolicy: subPolicyOverride,
+	})
+}
+
+func (s *teamService) GenerateTeamsWithOptions(ctx context.Context, matchID string, opts GenerateTeamsOptions) (*domain.MatchTeamsResponse, error) {
 	match, err := s.matchRepo.GetByID(ctx, matchID)
 	if err != nil {
 		return nil, err
@@ -53,8 +66,8 @@ func (s *teamService) GenerateTeams(ctx context.Context, matchID string, subPoli
 	}
 
 	subPolicy := match.SubPolicy
-	if subPolicyOverride != nil && subPolicyOverride.IsValid() {
-		subPolicy = *subPolicyOverride
+	if opts.SubPolicy != nil && opts.SubPolicy.IsValid() {
+		subPolicy = *opts.SubPolicy
 	}
 
 	attendees, err := s.matchRepo.GetAttendees(ctx, matchID)
@@ -71,8 +84,25 @@ func (s *teamService) GenerateTeams(ctx context.Context, matchID string, subPoli
 		players[i] = a.Player
 	}
 
+	targetFormat := match.Format
+	if opts.AutoFormat {
+		targetFormat = matchmaker.RecommendFormat(len(players))
+		if opts.SubPolicy == nil {
+			subPolicy = domain.PolicyDistributeAll
+		}
+	} else if opts.Format != nil && opts.Format.IsValid() {
+		targetFormat = *opts.Format
+	}
+
+	if targetFormat != match.Format {
+		match.Format = targetFormat
+		if err := s.matchRepo.Update(ctx, match); err != nil {
+			return nil, fmt.Errorf("failed updating match format: %w", err)
+		}
+	}
+
 	req := matchmaker.MatchmakingRequest{
-		Format:    match.Format,
+		Format:    targetFormat,
 		SubPolicy: subPolicy,
 		Attendees: players,
 		Shuffle:   true,
@@ -234,12 +264,20 @@ func formatWhatsAppMessage(match *domain.Match, teamsResp *domain.MatchTeamsResp
 
 func formatLabel(f domain.MatchFormat) string {
 	switch f {
+	case domain.FormatFiveASide:
+		return "5-a-side"
 	case domain.FormatSixASide:
 		return "6-a-side"
 	case domain.FormatSevenASide:
 		return "7-a-side"
+	case domain.FormatEightASide:
+		return "8-a-side"
 	case domain.FormatNineASide:
 		return "9-a-side"
+	case domain.FormatTenASide:
+		return "10-a-side"
+	case domain.FormatElevenASide:
+		return "11-a-side"
 	default:
 		return string(f)
 	}

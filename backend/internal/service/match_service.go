@@ -13,6 +13,7 @@ type MatchStore interface {
 	GetByID(ctx context.Context, id string) (*domain.Match, error)
 	List(ctx context.Context, status *domain.MatchStatus) ([]domain.Match, error)
 	Update(ctx context.Context, m *domain.Match) error
+	Delete(ctx context.Context, id string) error
 	SyncAttendees(ctx context.Context, matchID string, playerIDs []string) error
 	GetAttendees(ctx context.Context, matchID string) ([]domain.MatchAttendee, error)
 	AddLateAttendee(ctx context.Context, matchID string, playerID string) error
@@ -69,6 +70,13 @@ func (s *MatchService) GetMatch(ctx context.Context, id string) (*domain.Match, 
 
 func (s *MatchService) ListMatches(ctx context.Context, status *domain.MatchStatus) ([]domain.Match, error) {
 	return s.store.List(ctx, status)
+}
+
+func (s *MatchService) DeleteMatch(ctx context.Context, id string) error {
+	if strings.TrimSpace(id) == "" {
+		return fmt.Errorf("invalid match id")
+	}
+	return s.store.Delete(ctx, id)
 }
 
 func (s *MatchService) UpdateMatch(ctx context.Context, id string, input domain.UpdateMatchInput) (*domain.Match, error) {

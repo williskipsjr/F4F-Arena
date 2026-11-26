@@ -179,6 +179,38 @@ func (r *MatchRepository) Update(ctx context.Context, m *domain.Match) error {
 	return nil
 }
 
+func (r *MatchRepository) Delete(ctx context.Context, id string) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	for _, stmt := range []string{
+		"DELETE FROM team_assignments WHERE match_id = $1",
+		"DELETE FROM teams WHERE match_id = $1",
+		"DELETE FROM match_attendees WHERE match_id = $1",
+		"DELETE FROM match_votes WHERE match_id = $1",
+	} {
+		if _, err := tx.Exec(ctx, stmt, id); err != nil {
+			return fmt.Errorf("failed cleaning up match relations: %w", err)
+		}
+	}
+
+	tag, err := tx.Exec(ctx, "DELETE FROM matches WHERE id = $1", id)
+	if err != nil {
+		return fmt.Errorf("failed deleting match: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrMatchNotFound
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed committing match delete: %w", err)
+	}
+	return nil
+}
+
 func (r *MatchRepository) SyncAttendees(ctx context.Context, matchID string, playerIDs []string) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {

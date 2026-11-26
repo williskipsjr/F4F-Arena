@@ -95,6 +95,11 @@ func (m *mockMatchStore) RemoveAttendee(ctx context.Context, matchID string, pla
 	return nil
 }
 
+func (m *mockMatchStore) Delete(ctx context.Context, id string) error {
+	delete(m.matches, id)
+	return nil
+}
+
 func TestMatchHandler_Create(t *testing.T) {
 	store := newMockMatchStore()
 	svc := service.NewMatchService(store)

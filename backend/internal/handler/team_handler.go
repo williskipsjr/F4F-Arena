@@ -20,7 +20,9 @@ func NewTeamHandler(teamService service.TeamService) *TeamHandler {
 }
 
 type GenerateTeamsRequest struct {
-	SubPolicy *domain.SubstitutePolicy `json:"sub_policy,omitempty"`
+	SubPolicy  *domain.SubstitutePolicy `json:"sub_policy,omitempty"`
+	Format     *domain.MatchFormat      `json:"format,omitempty"`
+	AutoFormat bool                     `json:"auto_format,omitempty"`
 }
 
 func (h *TeamHandler) GenerateTeams(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +40,19 @@ func (h *TeamHandler) GenerateTeams(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	resp, err := h.teamService.GenerateTeams(r.Context(), matchID, req.SubPolicy)
+	var (
+		resp *domain.MatchTeamsResponse
+		err  error
+	)
+	if req.Format != nil || req.AutoFormat {
+		resp, err = h.teamService.GenerateTeamsWithOptions(r.Context(), matchID, service.GenerateTeamsOptions{
+			SubPolicy:  req.SubPolicy,
+			Format:     req.Format,
+			AutoFormat: req.AutoFormat,
+		})
+	} else {
+		resp, err = h.teamService.GenerateTeams(r.Context(), matchID, req.SubPolicy)
+	}
 	if err != nil {
 		if errors.Is(err, domain.ErrMatchNotFound) {
 			writeError(w, http.StatusNotFound, "NOT_FOUND", "Match not found")

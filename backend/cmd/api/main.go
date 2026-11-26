@@ -153,6 +153,7 @@ func main() {
 			if matchHandler != nil {
 				admin.Post("/api/v1/matches", matchHandler.Create)
 				admin.Patch("/api/v1/matches/{id}", matchHandler.Update)
+				admin.Delete("/api/v1/matches/{id}", matchHandler.Delete)
 				admin.Put("/api/v1/matches/{id}/attendees", matchHandler.SyncAttendees)
 				admin.Post("/api/v1/matches/{id}/attendees/late", matchHandler.AddLateArrival)
 				admin.Delete("/api/v1/matches/{id}/attendees/{playerId}", matchHandler.RemoveAttendee)

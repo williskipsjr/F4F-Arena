@@ -105,6 +105,21 @@ func (h *MatchHandler) Get(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *MatchHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if err := h.service.DeleteMatch(r.Context(), id); err != nil {
+		if errors.Is(err, postgres.ErrMatchNotFound) {
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "Match not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to delete match: "+err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"deleted": true,
+	})
+}
+
 func (h *MatchHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	var input domain.UpdateMatchInput

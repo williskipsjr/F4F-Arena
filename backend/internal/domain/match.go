@@ -13,14 +13,18 @@ var (
 type MatchFormat string
 
 const (
-	FormatSixASide   MatchFormat = "SIX_A_SIDE"
-	FormatSevenASide MatchFormat = "SEVEN_A_SIDE"
-	FormatNineASide  MatchFormat = "NINE_A_SIDE"
+	FormatFiveASide   MatchFormat = "FIVE_A_SIDE"
+	FormatSixASide    MatchFormat = "SIX_A_SIDE"
+	FormatSevenASide  MatchFormat = "SEVEN_A_SIDE"
+	FormatEightASide  MatchFormat = "EIGHT_A_SIDE"
+	FormatNineASide   MatchFormat = "NINE_A_SIDE"
+	FormatTenASide    MatchFormat = "TEN_A_SIDE"
+	FormatElevenASide MatchFormat = "ELEVEN_A_SIDE"
 )
 
 func (f MatchFormat) IsValid() bool {
 	switch f {
-	case FormatSixASide, FormatSevenASide, FormatNineASide:
+	case FormatFiveASide, FormatSixASide, FormatSevenASide, FormatEightASide, FormatNineASide, FormatTenASide, FormatElevenASide:
 		return true
 	default:
 		return false
@@ -29,12 +33,20 @@ func (f MatchFormat) IsValid() bool {
 
 func (f MatchFormat) PlayersPerTeam() int {
 	switch f {
+	case FormatFiveASide:
+		return 5
 	case FormatSixASide:
 		return 6
 	case FormatSevenASide:
 		return 7
+	case FormatEightASide:
+		return 8
 	case FormatNineASide:
 		return 9
+	case FormatTenASide:
+		return 10
+	case FormatElevenASide:
+		return 11
 	default:
 		return 7
 	}
