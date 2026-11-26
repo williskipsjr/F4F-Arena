@@ -1,6 +1,7 @@
 package com.f4f.arena
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -8,339 +9,672 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.AnnotatedString
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.f4f.arena.data.api.NetworkClient
 import com.f4f.arena.data.auth.SessionManager
-import com.f4f.arena.ui.HealthScreen
-import com.f4f.arena.ui.match.AttendanceScreen
-import com.f4f.arena.ui.match.MatchSetupScreen
-import com.f4f.arena.ui.match.TeamBoardScreen
-import com.f4f.arena.ui.roster.RosterScreen
-import com.f4f.arena.ui.theme.F4FArenaTheme
+import com.f4f.arena.data.model.MatchFormat as ApiMatchFormat
+import com.f4f.arena.data.model.MatchStatus
+import com.f4f.arena.data.model.MatchVoteDetail
+import com.f4f.arena.data.model.Player
+import com.f4f.arena.data.model.Position
+import com.f4f.arena.data.model.SubstitutePolicy
+import com.f4f.arena.ui.components.F4FBottomTab
+import com.f4f.arena.ui.components.FloatingDarkBottomBar
+import com.f4f.arena.ui.match.*
+import com.f4f.arena.ui.roster.AddPlayerDialog
+import com.f4f.arena.ui.roster.RosterUiState
+import com.f4f.arena.ui.roster.RosterViewModel
+import com.f4f.arena.ui.screens.*
+import com.f4f.arena.ui.state.*
+import com.f4f.arena.ui.theme.F4FMaterialTheme
+import com.f4f.arena.util.WhatsAppFormatter
 import kotlinx.coroutines.launch
-
-enum class AppDestination(val label: String) {
-    MATCHES("Matches"),
-    ROSTER("Roster"),
-    HEALTH("Health")
-}
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         setContent {
-            F4FArenaTheme {
-                var currentDestination by remember { mutableStateOf(AppDestination.MATCHES) }
-                var activeAttendanceMatchId by remember { mutableStateOf<String?>(null) }
-                var activeTeamBoardMatchId by remember { mutableStateOf<String?>(null) }
-                var showAuthDialog by remember { mutableStateOf(false) }
-
-                val context = LocalContext.current
-                val notificationPermissionLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.RequestPermission()
-                ) { }
-
-                LaunchedEffect(Unit) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        val granted = ContextCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.POST_NOTIFICATIONS
-                        ) == PackageManager.PERMISSION_GRANTED
-                        if (!granted) {
-                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        }
-                    }
-                }
-
-                val token by SessionManager.token.collectAsState()
-                val displayName by SessionManager.displayName.collectAsState()
-                val adminUser by SessionManager.adminUsername.collectAsState()
-                val role by SessionManager.role.collectAsState()
-                val authPromptRequired by SessionManager.authPromptRequired.collectAsState()
-                val isLoggedIn = !token.isNullOrBlank()
-                val isAdmin = isLoggedIn && role == "ADMIN"
-
-                LaunchedEffect(authPromptRequired) {
-                    if (authPromptRequired) {
-                        showAuthDialog = true
-                        SessionManager.consumeAuthPrompt()
-                    }
-                }
-
-                BackHandler(
-                    enabled = currentDestination == AppDestination.MATCHES &&
-                        (activeTeamBoardMatchId != null || activeAttendanceMatchId != null)
-                ) {
-                    when {
-                        activeTeamBoardMatchId != null -> activeTeamBoardMatchId = null
-                        activeAttendanceMatchId != null -> activeAttendanceMatchId = null
-                    }
-                }
-
-                Scaffold(
-                    bottomBar = {
-                        NavigationBar {
-                            NavigationBarItem(
-                                selected = currentDestination == AppDestination.MATCHES,
-                                onClick = {
-                                    currentDestination = AppDestination.MATCHES
-                                    activeAttendanceMatchId = null
-                                    activeTeamBoardMatchId = null
-                                },
-                                icon = { Icon(Icons.Default.SportsSoccer, contentDescription = "Matches") },
-                                label = { Text("Matches") }
-                            )
-                            NavigationBarItem(
-                                selected = currentDestination == AppDestination.ROSTER,
-                                onClick = { currentDestination = AppDestination.ROSTER },
-                                icon = { Icon(Icons.Default.People, contentDescription = "Roster") },
-                                label = { Text("Roster") }
-                            )
-                            NavigationBarItem(
-                                selected = currentDestination == AppDestination.HEALTH,
-                                onClick = { currentDestination = AppDestination.HEALTH },
-                                icon = { Icon(Icons.Default.Info, contentDescription = "Health") },
-                                label = { Text("System") }
-                            )
-                        }
-                    }
-                ) { innerPadding ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding)
-                    ) {
-                        // Session Status Bar
-                        Surface(
-                            color = when {
-                                isAdmin -> MaterialTheme.colorScheme.primaryContainer
-                                isLoggedIn -> MaterialTheme.colorScheme.tertiaryContainer
-                                else -> MaterialTheme.colorScheme.secondaryContainer
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 4.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        when {
-                                            isAdmin -> Icons.Default.VerifiedUser
-                                            isLoggedIn -> Icons.Default.Person
-                                            else -> Icons.Default.Lock
-                                        },
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = when {
-                                            isAdmin -> "Admin: ${displayName ?: adminUser ?: "Signed In"}"
-                                            isLoggedIn -> "Player: ${displayName ?: adminUser ?: "Signed In"}"
-                                            else -> "Guest (Sign in / Sign up to vote)"
-                                        },
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
-                                TextButton(
-                                    onClick = {
-                                        if (isLoggedIn) SessionManager.logout() else showAuthDialog = true
-                                    },
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-                                ) {
-                                    Text(if (isLoggedIn) "Sign Out" else "Sign In / Up")
-                                }
-                            }
-                        }
-
-                        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                            when (currentDestination) {
-                                AppDestination.MATCHES -> {
-                                    when {
-                                        activeTeamBoardMatchId != null -> {
-                                            TeamBoardScreen(
-                                                matchId = activeTeamBoardMatchId!!,
-                                                isAdmin = isAdmin,
-                                                onBack = { activeTeamBoardMatchId = null }
-                                            )
-                                        }
-                                        activeAttendanceMatchId != null -> {
-                                            AttendanceScreen(
-                                                matchId = activeAttendanceMatchId!!,
-                                                onBack = { activeAttendanceMatchId = null },
-                                                onProceedToMatchmaking = { matchId ->
-                                                    activeTeamBoardMatchId = matchId
-                                                }
-                                            )
-                                        }
-                                        else -> {
-                                            MatchSetupScreen(
-                                                isAdmin = isAdmin,
-                                                isLoggedIn = isLoggedIn,
-                                                onRequireAuth = { showAuthDialog = true },
-                                                onOpenAttendance = { matchId ->
-                                                    activeAttendanceMatchId = matchId
-                                                },
-                                                onOpenTeams = { matchId ->
-                                                    activeTeamBoardMatchId = matchId
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
-                                AppDestination.ROSTER -> RosterScreen(isAdmin = isAdmin)
-                                AppDestination.HEALTH -> HealthScreen()
-                            }
-                        }
-                    }
-                }
-
-                if (showAuthDialog) {
-                    AuthDialog(
-                        onDismiss = { showAuthDialog = false },
-                        onSuccess = { showAuthDialog = false }
-                    )
-                }
+            F4FMaterialTheme {
+                F4FArenaApp()
             }
         }
     }
 }
 
 @Composable
-fun AuthDialog(
-    onDismiss: () -> Unit,
-    onSuccess: () -> Unit
+private fun F4FArenaApp(
+    matchViewModel: MatchViewModel = viewModel(),
+    rosterViewModel: RosterViewModel = viewModel(),
+    attendanceViewModel: AttendanceViewModel = viewModel(),
+    teamBoardViewModel: TeamBoardViewModel = viewModel()
 ) {
-    var isSignUp by remember { mutableStateOf(false) }
-    var displayName by remember { mutableStateOf("") }
-    var username by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(false) }
-    var errorText by remember { mutableStateOf<String?>(null) }
+    var selectedTab by remember { mutableStateOf(F4FBottomTab.HOME) }
+    var searchQuery by remember { mutableStateOf("") }
+    var activeAttendanceMatchId by remember { mutableStateOf<String?>(null) }
+    var activeTeamBoardMatchId by remember { mutableStateOf<String?>(null) }
+
+    var showAuthSheet by remember { mutableStateOf(false) }
+    var authLoading by remember { mutableStateOf(false) }
+    var authError by remember { mutableStateOf<String?>(null) }
+
+    var showCreatePollModal by remember { mutableStateOf(false) }
+    var createPollLoading by remember { mutableStateOf(false) }
+    var createPollError by remember { mutableStateOf<String?>(null) }
+
+    var votersMatch by remember { mutableStateOf<MatchCardUi?>(null) }
+    var votersLoading by remember { mutableStateOf(false) }
+    var votersList by remember { mutableStateOf<List<PollVoteUi>>(emptyList()) }
+
+    var showAddPlayerDialog by remember { mutableStateOf(false) }
+    var editingPlayer by remember { mutableStateOf<Player?>(null) }
+    var showQuickGuestDialog by remember { mutableStateOf(false) }
+    var showWhatsAppDialog by remember { mutableStateOf(false) }
+
+    var healthUi by remember {
+        mutableStateOf(
+            SystemHealthUi(
+                baseUrl = NetworkClient.baseUrl,
+                apiConnected = false,
+                postgresConnected = false,
+                latencyMs = 0,
+                lastChecked = "Checking..."
+            )
+        )
+    }
+
+    val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
+    val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = if (isSignUp) "Player Sign Up" else "Sign In",
-                    fontWeight = FontWeight.Bold
-                )
-                TabRow(selectedTabIndex = if (isSignUp) 1 else 0) {
-                    Tab(
-                        selected = !isSignUp,
-                        onClick = { isSignUp = false; errorText = null },
-                        text = { Text("Sign In") }
-                    )
-                    Tab(
-                        selected = isSignUp,
-                        onClick = { isSignUp = true; errorText = null },
-                        text = { Text("Sign Up") }
-                    )
-                }
-            }
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (isSignUp) {
-                    OutlinedTextField(
-                        value = displayName,
-                        onValueChange = { displayName = it },
-                        label = { Text("Your Name (e.g. Lenpu)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-                OutlinedTextField(
-                    value = username,
-                    onValueChange = { username = it },
-                    label = { Text(if (isSignUp) "Username (for login)" else "Username (or admin)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                if (isSignUp) {
-                    OutlinedTextField(
-                        value = phone,
-                        onValueChange = { phone = it },
-                        label = { Text("Phone (optional)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = { Text(if (isSignUp) "PIN / Password (min 4 chars)" else "Password / Passphrase") },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                if (errorText != null) {
-                    Text(
-                        text = errorText!!,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            val canSubmit = if (isSignUp) {
-                !isLoading && displayName.isNotBlank() && username.isNotBlank() && password.length >= 4
-            } else {
-                !isLoading && username.isNotBlank() && password.isNotBlank()
-            }
-            Button(
-                enabled = canSubmit,
-                onClick = {
-                    scope.launch {
-                        isLoading = true
-                        errorText = null
-                        val res = if (isSignUp) {
-                            SessionManager.register(displayName, username, phone, password)
-                        } else {
-                            SessionManager.login(username, password)
-                        }
-                        isLoading = false
-                        if (res.isSuccess) {
-                            onSuccess()
-                        } else {
-                            errorText = res.exceptionOrNull()?.message ?: "Authentication failed"
-                        }
-                    }
-                }
-            ) {
-                Text(
-                    when {
-                        isLoading -> "Please wait..."
-                        isSignUp -> "Create Account"
-                        else -> "Sign In"
-                    }
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
+
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val granted = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
+    }
+
+    fun checkSystemHealth() {
+        scope.launch {
+            val start = System.currentTimeMillis()
+            try {
+                val res = NetworkClient.healthApi.getHealth()
+                val elapsed = (System.currentTimeMillis() - start).toInt()
+                val now = SimpleDateFormat("h:mm:ss a", Locale.getDefault()).format(Date())
+                if (res.isSuccessful && res.body() != null) {
+                    val body = res.body()!!
+                    healthUi = SystemHealthUi(
+                        baseUrl = NetworkClient.baseUrl,
+                        apiConnected = true,
+                        postgresConnected = body.database == "connected",
+                        latencyMs = elapsed,
+                        lastChecked = now
+                    )
+                } else {
+                    healthUi = healthUi.copy(apiConnected = false, postgresConnected = false, lastChecked = now)
+                }
+            } catch (_: Exception) {
+                val now = SimpleDateFormat("h:mm:ss a", Locale.getDefault()).format(Date())
+                healthUi = healthUi.copy(apiConnected = false, postgresConnected = false, lastChecked = now)
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) { checkSystemHealth() }
+
+    val token by SessionManager.token.collectAsState()
+    val displayName by SessionManager.displayName.collectAsState()
+    val username by SessionManager.adminUsername.collectAsState()
+    val role by SessionManager.role.collectAsState()
+    val playerId by SessionManager.playerId.collectAsState()
+    val authPromptRequired by SessionManager.authPromptRequired.collectAsState()
+
+    val isLoggedIn = !token.isNullOrBlank()
+    val sessionUi = if (isLoggedIn) {
+        UserSessionUi(
+            id = playerId ?: "admin",
+            name = displayName ?: username ?: "Member",
+            username = username ?: "member",
+            role = if (role == "ADMIN") UserRole.ADMIN else UserRole.PLAYER,
+            playerId = playerId
+        )
+    } else null
+    val isAdmin = sessionUi?.role == UserRole.ADMIN
+
+    LaunchedEffect(authPromptRequired) {
+        if (authPromptRequired) {
+            showAuthSheet = true
+            SessionManager.consumeAuthPrompt()
+        }
+    }
+
+    LaunchedEffect(activeAttendanceMatchId) {
+        if (activeAttendanceMatchId != null) {
+            attendanceViewModel.loadMatchAttendance(activeAttendanceMatchId!!)
+        }
+    }
+
+    LaunchedEffect(activeTeamBoardMatchId) {
+        if (activeTeamBoardMatchId != null) {
+            teamBoardViewModel.loadOrGenerateTeams(activeTeamBoardMatchId!!)
+        }
+    }
+
+    val matchState by matchViewModel.uiState.collectAsState()
+    val rosterState by rosterViewModel.uiState.collectAsState()
+    val attendanceState by attendanceViewModel.uiState.collectAsState()
+    val teamBoardState by teamBoardViewModel.uiState.collectAsState()
+
+    val matchActionMsg = (matchState as? MatchUiState.Success)?.actionMessage
+    LaunchedEffect(matchActionMsg) {
+        if (matchActionMsg != null) {
+            snackbarHostState.showSnackbar(matchActionMsg)
+            matchViewModel.clearActionMessage()
+        }
+    }
+
+    val rosterActionMsg = (rosterState as? RosterUiState.Success)?.actionMessage
+    LaunchedEffect(rosterActionMsg) {
+        if (rosterActionMsg != null) {
+            snackbarHostState.showSnackbar(rosterActionMsg)
+            rosterViewModel.clearActionMessage()
+        }
+    }
+
+    val attendanceSaveMsg = (attendanceState as? AttendanceUiState.Success)?.saveMessage
+    LaunchedEffect(attendanceSaveMsg) {
+        if (attendanceSaveMsg != null) {
+            snackbarHostState.showSnackbar(attendanceSaveMsg)
+            attendanceViewModel.clearSaveMessage()
+        }
+    }
+
+    val teamBannerMsg = (teamBoardState as? TeamBoardUiState.Success)?.bannerMessage
+    LaunchedEffect(teamBannerMsg) {
+        if (teamBannerMsg != null) {
+            snackbarHostState.showSnackbar(teamBannerMsg)
+        }
+    }
+
+    BackHandler(enabled = activeTeamBoardMatchId != null || activeAttendanceMatchId != null) {
+        when {
+            activeTeamBoardMatchId != null -> activeTeamBoardMatchId = null
+            activeAttendanceMatchId != null -> activeAttendanceMatchId = null
+        }
+    }
+
+    fun openVotersForMatch(card: MatchCardUi) {
+        votersMatch = card
+        votersLoading = true
+        votersList = emptyList()
+        matchViewModel.loadMatchVotes(card.id) { res ->
+            votersLoading = false
+            res.onSuccess { list -> votersList = list.map { it.toUi() } }
+                .onFailure { err ->
+                    scope.launch { snackbarHostState.showSnackbar(err.localizedMessage ?: "Failed to load votes") }
+                }
+        }
+    }
+
+    val allMatchCards: List<MatchCardUi> = when (val st = matchState) {
+        is MatchUiState.Success -> st.matches.map { it.toCardUi() }
+        else -> emptyList()
+    }
+    val filteredMatchCards = allMatchCards.filter {
+        searchQuery.isBlank() ||
+            it.title.contains(searchQuery, ignoreCase = true) ||
+            it.venue.contains(searchQuery, ignoreCase = true)
+    }
+    val featuredPoll = filteredMatchCards.firstOrNull { it.pollOpen } ?: filteredMatchCards.firstOrNull()
+    val exploreMatches = if (featuredPoll != null) filteredMatchCards.filter { it.id != featuredPoll.id } else filteredMatchCards
+
+    val rawPlayers: List<Player> = (rosterState as? RosterUiState.Success)?.allPlayers ?: emptyList()
+    val uiPlayers: List<PlayerUi> = rawPlayers.map { it.toUi() }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        when {
+            activeTeamBoardMatchId != null -> {
+                val tbSuccess = teamBoardState as? TeamBoardUiState.Success
+                if (tbSuccess != null) {
+                    val data = tbSuccess.data
+                    TeamBoardScreen(
+                        format = data.format.toUi(),
+                        policy = data.subPolicy.toUi(),
+                        teams = data.teams.map { t ->
+                            GeneratedTeamUi(
+                                id = t.id,
+                                name = t.teamName,
+                                kitColorName = t.bibColor ?: "Bibs",
+                                kitColorHex = bibHex(t.bibColor),
+                                players = t.players.map { p ->
+                                    TeamSlotUi(
+                                        playerId = p.id,
+                                        name = p.displayName,
+                                        position = p.assignedPosition.toUi(),
+                                        isManual = p.isManualOverride
+                                    )
+                                },
+                                needsEmergencyGk = t.players.none { it.assignedPosition == Position.KEEPER }
+                            )
+                        },
+                        bench = data.substitutes.map { s ->
+                            TeamSlotUi(
+                                playerId = s.id,
+                                name = s.displayName,
+                                position = s.primaryPosition.toUi(),
+                                isManual = s.isManualOverride
+                            )
+                        },
+                        isAdmin = isAdmin,
+                        isFinalised = data.status == MatchStatus.FINALISED,
+                        isGenerating = tbSuccess.isGenerating,
+                        swapSourcePlayerId = tbSuccess.selectedPlayerForSwap?.id,
+                        onBack = { activeTeamBoardMatchId = null },
+                        onPolicyChange = { newPolicy ->
+                            teamBoardViewModel.generateTeams(activeTeamBoardMatchId!!, newPolicy.toApi())
+                        },
+                        onReshuffle = {
+                            teamBoardViewModel.generateTeams(activeTeamBoardMatchId!!)
+                        },
+                        onTapPlayerForSwap = { pid ->
+                            val target = (data.teams.flatMap { it.players } + data.substitutes).firstOrNull { it.id == pid }
+                            if (target != null) teamBoardViewModel.onPlayerClicked(target)
+                        },
+                        onMovePlayer = { pid, targetTeamId ->
+                            teamBoardViewModel.movePlayer(pid, targetTeamId, isSubstitute = targetTeamId == null)
+                        },
+                        onToggleFinalise = {
+                            teamBoardViewModel.finaliseMatch()
+                        },
+                        onOpenExport = { showWhatsAppDialog = true }
+                    )
+
+                    if (showWhatsAppDialog) {
+                        val formatted = remember(data) { WhatsAppFormatter.format(data) }
+                        WhatsAppExportDialog(
+                            formattedText = formatted,
+                            onCopy = {
+                                clipboardManager.setText(AnnotatedString(formatted))
+                                showWhatsAppDialog = false
+                                scope.launch { snackbarHostState.showSnackbar("Copied to clipboard for WhatsApp!") }
+                            },
+                            onShare = {
+                                val sendIntent = Intent().apply {
+                                    action = Intent.ACTION_SEND
+                                    putExtra(Intent.EXTRA_TEXT, formatted)
+                                    type = "text/plain"
+                                }
+                                context.startActivity(Intent.createChooser(sendIntent, "Share Teams via"))
+                            },
+                            onDismiss = { showWhatsAppDialog = false }
+                        )
+                    }
+                } else {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        if (teamBoardState is TeamBoardUiState.Error) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text((teamBoardState as TeamBoardUiState.Error).message)
+                                Button(onClick = { teamBoardViewModel.loadOrGenerateTeams(activeTeamBoardMatchId!!) }) {
+                                    Text("Retry")
+                                }
+                                TextButton(onClick = { activeTeamBoardMatchId = null }) { Text("Back") }
+                            }
+                        } else {
+                            CircularProgressIndicator()
+                        }
+                    }
+                }
+            }
+
+            activeAttendanceMatchId != null -> {
+                val attSuccess = attendanceState as? AttendanceUiState.Success
+                if (attSuccess != null) {
+                    AttendanceCheckInScreen(
+                        format = attSuccess.match.format.toUi(),
+                        players = attSuccess.allPlayers.map { it.toUi() },
+                        checkedInIds = attSuccess.selectedPlayerIds,
+                        isSaving = attSuccess.isSaving,
+                        onBack = { activeAttendanceMatchId = null },
+                        onTogglePlayer = { attendanceViewModel.togglePlayer(it) },
+                        onSelectAll = { attendanceViewModel.selectAllActive() },
+                        onClearAll = { attendanceViewModel.clearSelection() },
+                        onQuickAddGuest = { showQuickGuestDialog = true },
+                        onSaveAttendance = { attendanceViewModel.saveAttendance() },
+                        onGenerateTeams = {
+                            attendanceViewModel.saveAttendance {
+                                activeTeamBoardMatchId = activeAttendanceMatchId
+                            }
+                        }
+                    )
+                } else {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                }
+            }
+
+            else -> {
+                when (selectedTab) {
+                    F4FBottomTab.HOME -> {
+                        HomeDashboardScreen(
+                            session = sessionUi,
+                            searchQuery = searchQuery,
+                            featuredPoll = featuredPoll,
+                            exploreMatches = exploreMatches,
+                            onSearchChange = { searchQuery = it },
+                            onAvatarClick = {
+                                if (isLoggedIn) selectedTab = F4FBottomTab.SYSTEM else showAuthSheet = true
+                            },
+                            onVote = { matchId, voteIn ->
+                                if (!isLoggedIn) {
+                                    showAuthSheet = true
+                                } else {
+                                    matchViewModel.castVote(matchId, if (voteIn) "IN" else "OUT")
+                                }
+                            },
+                            onOpenVoters = { matchId ->
+                                allMatchCards.firstOrNull { it.id == matchId }?.let { openVotersForMatch(it) }
+                            },
+                            onSwitchFormat = { matchId, fmt ->
+                                matchViewModel.updateMatchFormat(matchId, fmt.toApi())
+                            },
+                            onOpenTeams = { matchId -> activeTeamBoardMatchId = matchId },
+                            onOpenCheckIn = { matchId -> activeAttendanceMatchId = matchId },
+                            onSeeAllMatches = { selectedTab = F4FBottomTab.MATCHES },
+                            onCreateNewPoll = { showCreatePollModal = true }
+                        )
+                    }
+
+                    F4FBottomTab.MATCHES -> {
+                        AllMatchesScreen(
+                            matches = allMatchCards,
+                            isAdmin = isAdmin,
+                            onBack = { selectedTab = F4FBottomTab.HOME },
+                            onOpenVoters = { matchId ->
+                                allMatchCards.firstOrNull { it.id == matchId }?.let { openVotersForMatch(it) }
+                            },
+                            onOpenTeams = { matchId -> activeTeamBoardMatchId = matchId },
+                            onOpenCheckIn = { matchId -> activeAttendanceMatchId = matchId }
+                        )
+                    }
+
+                    F4FBottomTab.ROSTER -> {
+                        RosterScreen(
+                            players = uiPlayers,
+                            isAdmin = isAdmin,
+                            onEditPlayer = { playerUi ->
+                                editingPlayer = rawPlayers.firstOrNull { it.id == playerUi.id }
+                            },
+                            onToggleActive = { pid, _ ->
+                                rawPlayers.firstOrNull { it.id == pid }?.let { rosterViewModel.togglePlayerActive(it) }
+                            },
+                            onAddPlayer = { showAddPlayerDialog = true }
+                        )
+                    }
+
+                    F4FBottomTab.SYSTEM -> {
+                        SystemHealthScreen(
+                            health = healthUi,
+                            session = sessionUi,
+                            onRecheck = { checkSystemHealth() },
+                            onOpenAuth = { showAuthSheet = true },
+                            onSignOut = {
+                                SessionManager.logout()
+                                matchViewModel.loadMatches()
+                            }
+                        )
+                    }
+                }
+
+                FloatingDarkBottomBar(
+                    selectedTab = selectedTab,
+                    onSelectTab = { selectedTab = it },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                )
+            }
+        }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+        )
+    }
+
+    if (showAuthSheet) {
+        AuthBottomSheet(
+            isLoading = authLoading,
+            errorMessage = authError,
+            onDismiss = { if (!authLoading) showAuthSheet = false },
+            onSignIn = { user, pass ->
+                scope.launch {
+                    authLoading = true
+                    authError = null
+                    val res = SessionManager.login(user, pass)
+                    authLoading = false
+                    if (res.isSuccess) {
+                        showAuthSheet = false
+                        matchViewModel.loadMatches()
+                    } else {
+                        authError = res.exceptionOrNull()?.message ?: "Sign in failed"
+                    }
+                }
+            },
+            onSignUp = { name, user, phone, pin ->
+                scope.launch {
+                    authLoading = true
+                    authError = null
+                    val res = SessionManager.register(name, user, phone, pin)
+                    authLoading = false
+                    if (res.isSuccess) {
+                        showAuthSheet = false
+                        matchViewModel.loadMatches()
+                        rosterViewModel.loadRoster()
+                    } else {
+                        authError = res.exceptionOrNull()?.message ?: "Sign up failed"
+                    }
+                }
+            }
+        )
+    }
+
+    if (showCreatePollModal) {
+        CreatePollModal(
+            isCreating = createPollLoading,
+            errorMessage = createPollError,
+            onDismiss = { showCreatePollModal = false },
+            onCreatePoll = { title, kickoff, venue, fmt, openPoll ->
+                createPollLoading = true
+                createPollError = null
+                matchViewModel.createMatch(
+                    title = title,
+                    format = fmt.toApi(),
+                    venue = venue,
+                    kickoffTime = kickoff,
+                    isPollOpen = openPoll,
+                    onSuccess = {
+                        createPollLoading = false
+                        showCreatePollModal = false
+                    },
+                    onError = { err ->
+                        createPollLoading = false
+                        createPollError = err
+                    }
+                )
+            }
+        )
+    }
+
+    if (votersMatch != null) {
+        PollVotersSheet(
+            matchTitle = votersMatch!!.title,
+            votes = votersList,
+            isLoading = votersLoading,
+            onRefresh = { openVotersForMatch(votersMatch!!) },
+            onDismiss = { votersMatch = null }
+        )
+    }
+
+    if (showAddPlayerDialog) {
+        AddPlayerDialog(
+            onDismiss = { showAddPlayerDialog = false },
+            onConfirm = { name, pos, notes ->
+                rosterViewModel.createPlayer(name, pos, notes)
+                showAddPlayerDialog = false
+            }
+        )
+    }
+
+    if (editingPlayer != null) {
+        val target = editingPlayer!!
+        AddPlayerDialog(
+            initialName = target.displayName,
+            initialPosition = target.primaryPosition,
+            initialNotes = target.notes ?: "",
+            dialogTitle = "Assign Position / Edit Player",
+            confirmLabel = "Save",
+            onDismiss = { editingPlayer = null },
+            onConfirm = { name, pos, notes ->
+                rosterViewModel.updatePlayerDetails(target.id, name, pos, notes)
+                editingPlayer = null
+            }
+        )
+    }
+
+    if (showQuickGuestDialog) {
+        AddPlayerDialog(
+            dialogTitle = "Quick Add Guest",
+            confirmLabel = "Add & Check In",
+            onDismiss = { showQuickGuestDialog = false },
+            onConfirm = { name, pos, _ ->
+                attendanceViewModel.quickAddGuest(name, pos)
+                showQuickGuestDialog = false
+            }
+        )
+    }
+}
+
+private fun Position.toUi(): PlayerPosition = when (this) {
+    Position.KEEPER -> PlayerPosition.GK
+    Position.DEFENDER -> PlayerPosition.DEF
+    Position.MIDFIELDER -> PlayerPosition.MID
+    Position.STRIKER -> PlayerPosition.STR
+}
+
+private fun ApiMatchFormat.toUi(): MatchFormat = when (this) {
+    ApiMatchFormat.SIX_A_SIDE -> MatchFormat.SIX_A_SIDE
+    ApiMatchFormat.SEVEN_A_SIDE -> MatchFormat.SEVEN_A_SIDE
+    ApiMatchFormat.NINE_A_SIDE -> MatchFormat.NINE_A_SIDE
+}
+
+private fun MatchFormat.toApi(): ApiMatchFormat = when (this) {
+    MatchFormat.SIX_A_SIDE -> ApiMatchFormat.SIX_A_SIDE
+    MatchFormat.SEVEN_A_SIDE -> ApiMatchFormat.SEVEN_A_SIDE
+    MatchFormat.NINE_A_SIDE -> ApiMatchFormat.NINE_A_SIDE
+}
+
+private fun SubstitutePolicy.toUi(): TeamPolicy = when (this) {
+    SubstitutePolicy.STRICT_SUBSTITUTES -> TeamPolicy.STRICT_SUBS
+    SubstitutePolicy.DISTRIBUTE_ALL -> TeamPolicy.DISTRIBUTE_ALL
+}
+
+private fun TeamPolicy.toApi(): SubstitutePolicy = when (this) {
+    TeamPolicy.STRICT_SUBS -> SubstitutePolicy.STRICT_SUBSTITUTES
+    TeamPolicy.DISTRIBUTE_ALL -> SubstitutePolicy.DISTRIBUTE_ALL
+}
+
+private fun Player.toUi(): PlayerUi = PlayerUi(
+    id = id,
+    name = displayName,
+    position = primaryPosition.toUi(),
+    isActive = isActive,
+    notes = notes ?: ""
+)
+
+private fun MatchVoteDetail.toUi(): PollVoteUi = PollVoteUi(
+    playerId = playerId,
+    playerName = displayName,
+    position = primaryPosition.toUi(),
+    isIn = vote == "IN",
+    votedAtLabel = formatIsoTimestamp(votedAt)
+)
+
+private fun com.f4f.arena.data.model.Match.toCardUi(): MatchCardUi = MatchCardUi(
+    id = id,
+    title = title,
+    kickoffTime = kickoffTime ?: "TBD",
+    dateLabel = formatMatchDate(createdAt),
+    venue = venue ?: "Turf Ground",
+    format = format.toUi(),
+    pollOpen = isPollOpen,
+    inCount = inCount,
+    outCount = outCount,
+    currentUserVoteIn = when (myVote) {
+        "IN" -> true
+        "OUT" -> false
+        else -> null
+    },
+    teamsReady = status == MatchStatus.TEAMS_GENERATED || status == MatchStatus.FINALISED,
+    finalised = status == MatchStatus.FINALISED
+)
+
+private fun bibHex(bibColor: String?): Long = when (bibColor?.lowercase(Locale.US)) {
+    "orange" -> 0xFFF97316
+    "green" -> 0xFF22C55E
+    "blue" -> 0xFF3B82F6
+    "yellow" -> 0xFFEAB308
+    "red" -> 0xFFEF4444
+    else -> 0xFF132A1E
+}
+
+private fun formatMatchDate(iso: String?): String {
+    if (iso.isNullOrBlank()) return "Today"
+    return formatIsoTimestamp(iso, "EEE, MMM d")
+}
+
+private fun formatIsoTimestamp(isoString: String, outPattern: String = "MMM d, h:mm a"): String {
+    val formats = listOf(
+        "yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'",
+        "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+        "yyyy-MM-dd'T'HH:mm:ss'Z'"
     )
+    for (pattern in formats) {
+        try {
+            val parser = SimpleDateFormat(pattern, Locale.US).apply {
+                timeZone = TimeZone.getTimeZone("UTC")
+            }
+            val date = parser.parse(isoString) ?: continue
+            return SimpleDateFormat(outPattern, Locale.getDefault()).format(date)
+        } catch (_: Exception) {
+        }
+    }
+    return isoString.take(16).replace("T", " ")
 }
