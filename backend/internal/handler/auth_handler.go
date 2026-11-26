@@ -19,10 +19,16 @@ type LoginRequest struct {
 type RegisterRequest struct {
 	DisplayName     string           `json:"display_name"`
 	Username        string           `json:"username"`
-	Phone           string           `json:"phone,omitempty"`
+	Phone           string           `json:"phone"`
 	Password        string           `json:"password"`
 	PrimaryPosition *domain.Position `json:"primary_position,omitempty"`
 	PlayerID        *string          `json:"player_id,omitempty"`
+}
+
+type ResetPinRequest struct {
+	Username    string `json:"username"`
+	Phone       string `json:"phone"`
+	NewPassword string `json:"new_password"`
 }
 
 type LoginResponse struct {
@@ -155,4 +161,31 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Invalid username or password")
+}
+
+func (h *AuthHandler) ResetPin(w http.ResponseWriter, r *http.Request) {
+	if h.accountRepo == nil {
+		writeError(w, http.StatusServiceUnavailable, "DB_UNAVAILABLE", "Database unavailable")
+		return
+	}
+
+	var req ResetPinRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "Invalid JSON request body")
+		return
+	}
+
+	if err := h.accountRepo.ResetPinByPhone(r.Context(), req.Username, req.Phone, req.NewPassword); err != nil {
+		if errors.Is(err, postgres.ErrInvalidCredentials) {
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "Account not found")
+			return
+		}
+		writeError(w, http.StatusBadRequest, "RESET_FAILED", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"status":  "ok",
+		"message": "PIN updated successfully",
+	})
 }

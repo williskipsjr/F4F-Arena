@@ -108,6 +108,7 @@ func main() {
 	})
 	r.Post("/api/v1/auth/login", authHandler.Login)
 	r.Post("/api/v1/auth/register", authHandler.Register)
+	r.Post("/api/v1/auth/reset-pin", authHandler.ResetPin)
 	if playerHandler != nil {
 		r.Get("/api/v1/players", playerHandler.List)
 		r.Get("/api/v1/players/{id}", playerHandler.Get)
