@@ -100,7 +100,8 @@ object SessionManager {
         displayName: String,
         username: String,
         phone: String?,
-        password: String
+        password: String,
+        playerId: String? = null
     ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val trimmedUser = username.trim()
@@ -109,7 +110,8 @@ object SessionManager {
                     displayName = displayName.trim(),
                     username = trimmedUser,
                     phone = phone?.trim()?.ifBlank { null },
-                    password = password
+                    password = password,
+                    playerId = playerId
                 )
             )
             if (response.isSuccessful && response.body() != null) {

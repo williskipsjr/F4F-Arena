@@ -12,7 +12,8 @@ data class RegisterRequest(
     @SerializedName("username") val username: String,
     @SerializedName("phone") val phone: String? = null,
     @SerializedName("password") val password: String,
-    @SerializedName("primary_position") val primaryPosition: String? = null
+    @SerializedName("primary_position") val primaryPosition: String? = null,
+    @SerializedName("player_id") val playerId: String? = null
 )
 
 data class LoginResponse(
