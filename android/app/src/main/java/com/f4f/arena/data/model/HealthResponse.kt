@@ -9,3 +9,10 @@ data class HealthResponse(
     @SerializedName("database") val database: String,
     @SerializedName("timestamp") val timestamp: String
 )
+
+data class AppVersionResponse(
+    @SerializedName("version_code") val versionCode: Int,
+    @SerializedName("version_name") val versionName: String,
+    @SerializedName("download_url") val downloadUrl: String = "",
+    @SerializedName("release_notes") val releaseNotes: String = ""
+)
