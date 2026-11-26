@@ -50,15 +50,15 @@ fun OnboardingWelcomeScreen(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(88.dp)
+                        .size(92.dp)
                         .clip(RoundedCornerShape(24.dp))
-                        .background(F4FColors.PitchGreen),
+                        .background(F4FColors.ForestDeep),
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.ic_launcher_foreground),
                         contentDescription = "F4F Arena Logo",
-                        modifier = Modifier.size(82.dp)
+                        modifier = Modifier.size(86.dp)
                     )
                 }
 
