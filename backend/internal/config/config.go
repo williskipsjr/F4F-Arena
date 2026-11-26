@@ -40,7 +40,7 @@ func Load() *Config {
 
 	adminPassphrase := getEnv("ADMIN_PASSPHRASE", "")
 	if adminPassphrase == "" {
-		adminPassphrase = getEnv("ADMIN_PASSWORD_HASH", "admin@f4f")
+		adminPassphrase = getEnv("ADMIN_PASSWORD_HASH", "")
 	}
 
 	latestVersionCode, err := strconv.Atoi(getEnv("APP_LATEST_VERSION_CODE", "1"))

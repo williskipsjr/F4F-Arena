@@ -133,6 +133,7 @@ func main() {
 			w.WriteHeader(http.StatusOK)
 			_, _ = fmt.Fprintf(w, `{"status":"authenticated","user":"%s","role":"%s"}`, claims.Username, claims.Role)
 		})
+		authed.Post("/api/v1/auth/change-password", authHandler.ChangePassword)
 		if matchHandler != nil {
 			authed.Post("/api/v1/matches/{id}/vote", matchHandler.CastVote)
 		}

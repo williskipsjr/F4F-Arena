@@ -265,6 +265,89 @@ func (r *AccountRepository) ResetPinByPhone(ctx context.Context, username, phone
 	return nil
 }
 
+// VerifyAdminPassword checks a DB-stored ADMIN hash first, falling back to envFallback
+// only when no DB admin password has been set yet.
+func (r *AccountRepository) VerifyAdminPassword(ctx context.Context, username, password, envFallback string) (string, bool, error) {
+	trimmedUser := strings.ToLower(strings.TrimSpace(username))
+	if trimmedUser == "" || password == "" {
+		return "", false, nil
+	}
+
+	var playerID, storedHash string
+	err := r.pool.QueryRow(ctx, `
+		SELECT player_id, password_hash
+		FROM player_accounts
+		WHERE username = $1 AND role = 'ADMIN'
+		LIMIT 1
+	`, trimmedUser).Scan(&playerID, &storedHash)
+	if err == nil {
+		return playerID, verifyPassword(password, storedHash), nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return "", false, err
+	}
+
+	if envFallback == "" || subtle.ConstantTimeCompare([]byte(password), []byte(envFallback)) != 1 {
+		return "", false, nil
+	}
+	pid, err := r.EnsureAdminPlayer(ctx, username)
+	if err != nil {
+		return "", true, nil
+	}
+	return pid, true, nil
+}
+
+// ChangePassword updates the authenticated user's password/PIN in player_accounts.
+func (r *AccountRepository) ChangePassword(ctx context.Context, username, role, currentPassword, newPassword, envFallback string) error {
+	trimmedUser := strings.ToLower(strings.TrimSpace(username))
+	minLen := 4
+	if strings.EqualFold(role, "ADMIN") {
+		minLen = 6
+	}
+	if trimmedUser == "" || currentPassword == "" || len(newPassword) < minLen {
+		return fmt.Errorf("current password and new password (min %d characters) are required", minLen)
+	}
+
+	var accountID, storedHash string
+	err := r.pool.QueryRow(ctx, `
+		SELECT id, password_hash FROM player_accounts WHERE username = $1 LIMIT 1
+	`, trimmedUser).Scan(&accountID, &storedHash)
+
+	now := time.Now().UTC()
+	newHash, hashErr := hashPassword(newPassword)
+	if hashErr != nil {
+		return fmt.Errorf("failed securing new password: %w", hashErr)
+	}
+
+	if err == nil {
+		if !verifyPassword(currentPassword, storedHash) {
+			return ErrInvalidCredentials
+		}
+		_, updErr := r.pool.Exec(ctx, `
+			UPDATE player_accounts SET password_hash = $1, updated_at = $2 WHERE id = $3
+		`, newHash, now, accountID)
+		return updErr
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+
+	if !strings.EqualFold(role, "ADMIN") || envFallback == "" ||
+		subtle.ConstantTimeCompare([]byte(currentPassword), []byte(envFallback)) != 1 {
+		return ErrInvalidCredentials
+	}
+
+	pid, pidErr := r.EnsureAdminPlayer(ctx, username)
+	if pidErr != nil {
+		return fmt.Errorf("failed resolving admin profile: %w", pidErr)
+	}
+	_, insErr := r.pool.Exec(ctx, `
+		INSERT INTO player_accounts (player_id, username, password_hash, role, created_at, updated_at)
+		VALUES ($1, $2, $3, 'ADMIN', $4, $4)
+	`, pid, trimmedUser, newHash, now)
+	return insErr
+}
+
 func normalizePhone(raw string) string {
 	var b strings.Builder
 	for _, ch := range raw {
