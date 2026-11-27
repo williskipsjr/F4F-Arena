@@ -144,6 +144,37 @@ class MatchViewModel(
         }
     }
 
+    fun loadMatchComments(
+        matchId: String,
+        onResult: (Result<List<com.f4f.arena.data.model.MatchComment>>) -> Unit
+    ) {
+        viewModelScope.launch {
+            onResult(repository.getMatchComments(matchId))
+        }
+    }
+
+    fun postMatchComment(
+        matchId: String,
+        message: String,
+        token: String = SessionManager.getBearerToken(),
+        onResult: (Result<com.f4f.arena.data.model.MatchComment>) -> Unit
+    ) {
+        viewModelScope.launch {
+            onResult(repository.postMatchComment(token, matchId, message))
+        }
+    }
+
+    fun deleteMatchComment(
+        matchId: String,
+        commentId: String,
+        token: String = SessionManager.getBearerToken(),
+        onResult: (Result<Unit>) -> Unit
+    ) {
+        viewModelScope.launch {
+            onResult(repository.deleteMatchComment(token, matchId, commentId))
+        }
+    }
+
     fun endMatch(
         matchId: String,
         token: String = SessionManager.getBearerToken()

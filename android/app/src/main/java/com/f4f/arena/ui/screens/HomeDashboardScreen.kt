@@ -219,7 +219,8 @@ private fun FeaturedPollCard(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .shadow(12.dp, RoundedCornerShape(24.dp), ambientColor = F4FColors.ForestDeep.copy(alpha = 0.14f)),
+            .shadow(12.dp, RoundedCornerShape(24.dp), ambientColor = F4FColors.ForestDeep.copy(alpha = 0.14f))
+            .clickable(onClick = onOpenVoters),
         shape = RoundedCornerShape(24.dp),
         color = F4FColors.CardWhite
     ) {
@@ -236,9 +237,9 @@ private fun FeaturedPollCard(
                 )
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        text = "Who Voted",
+                        text = "Votes & Comments",
                         style = MaterialTheme.typography.labelMedium,
-                        color = F4FColors.TextSecondary,
+                        color = F4FColors.ForestMid,
                         modifier = Modifier.clickable(onClick = onOpenVoters)
                     )
                     if (isAdmin) {

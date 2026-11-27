@@ -90,6 +90,8 @@ private fun F4FArenaApp(
     var votersMatch by remember { mutableStateOf<MatchCardUi?>(null) }
     var votersLoading by remember { mutableStateOf(false) }
     var votersList by remember { mutableStateOf<List<PollVoteUi>>(emptyList()) }
+    var commentsList by remember { mutableStateOf<List<PollCommentUi>>(emptyList()) }
+    var postingComment by remember { mutableStateOf(false) }
 
     var showAddPlayerDialog by remember { mutableStateOf(false) }
     var editingPlayer by remember { mutableStateOf<Player?>(null) }
@@ -279,12 +281,16 @@ private fun F4FArenaApp(
         votersMatch = card
         votersLoading = true
         votersList = emptyList()
+        commentsList = emptyList()
         matchViewModel.loadMatchVotes(card.id) { res ->
             votersLoading = false
             res.onSuccess { list -> votersList = list.map { it.toUi() } }
                 .onFailure { err ->
                     scope.launch { snackbarHostState.showSnackbar(err.localizedMessage ?: "Failed to load votes") }
                 }
+        }
+        matchViewModel.loadMatchComments(card.id) { res ->
+            res.onSuccess { list -> commentsList = list.map { it.toUi() } }
         }
     }
 
@@ -614,11 +620,11 @@ private fun F4FArenaApp(
                     }
                 }
             },
-            onSignUp = { name, user, phone, pin ->
+            onSignUp = { name, phone, age, pin, firebaseIdToken ->
                 scope.launch {
                     authLoading = true
                     authError = null
-                    val res = SessionManager.register(name, user, phone, pin)
+                    val res = SessionManager.register(name, phone, age, pin, firebaseIdToken)
                     authLoading = false
                     if (res.isSuccess) {
                         showAuthSheet = false
@@ -703,11 +709,40 @@ private fun F4FArenaApp(
     }
 
     if (votersMatch != null) {
+        val currentCard = votersMatch!!
         PollVotersSheet(
-            matchTitle = votersMatch!!.title,
+            matchTitle = currentCard.title,
             votes = votersList,
+            comments = commentsList,
             isLoading = votersLoading,
-            onRefresh = { openVotersForMatch(votersMatch!!) },
+            isLoggedIn = isLoggedIn,
+            isAdmin = isAdmin,
+            isPostingComment = postingComment,
+            onRefresh = { openVotersForMatch(currentCard) },
+            onPostComment = { msg ->
+                postingComment = true
+                matchViewModel.postMatchComment(currentCard.id, msg) { res ->
+                    postingComment = false
+                    res.onSuccess { created ->
+                        commentsList = commentsList + created.toUi()
+                    }.onFailure { err ->
+                        scope.launch { snackbarHostState.showSnackbar(err.localizedMessage ?: "Failed to post comment") }
+                    }
+                }
+            },
+            onDeleteComment = { cid ->
+                matchViewModel.deleteMatchComment(currentCard.id, cid) { res ->
+                    res.onSuccess {
+                        commentsList = commentsList.filterNot { it.id == cid }
+                    }.onFailure { err ->
+                        scope.launch { snackbarHostState.showSnackbar(err.localizedMessage ?: "Failed to delete comment") }
+                    }
+                }
+            },
+            onRequireSignIn = {
+                votersMatch = null
+                showAuthSheet = true
+            },
             onDismiss = { votersMatch = null }
         )
     }
@@ -792,8 +827,17 @@ private fun Player.toUi(): PlayerUi = PlayerUi(
     id = id,
     name = displayName,
     position = primaryPosition.toUi(),
+    age = age,
     isActive = isActive,
     notes = notes ?: ""
+)
+
+private fun com.f4f.arena.data.model.MatchComment.toUi(): PollCommentUi = PollCommentUi(
+    id = id,
+    authorName = authorName,
+    isAdmin = authorRole.equals("ADMIN", ignoreCase = true),
+    message = message,
+    createdAtLabel = formatIsoTimestamp(createdAt)
 )
 
 private fun MatchVoteDetail.toUi(): PollVoteUi = PollVoteUi(

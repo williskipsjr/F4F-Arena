@@ -11,9 +11,9 @@ data class RegisterRequest(
     @SerializedName("display_name") val displayName: String,
     @SerializedName("username") val username: String,
     @SerializedName("phone") val phone: String,
+    @SerializedName("age") val age: Int,
     @SerializedName("password") val password: String,
-    @SerializedName("primary_position") val primaryPosition: String? = null,
-    @SerializedName("player_id") val playerId: String? = null
+    @SerializedName("firebase_id_token") val firebaseIdToken: String? = null
 )
 
 data class ResetPinRequest(

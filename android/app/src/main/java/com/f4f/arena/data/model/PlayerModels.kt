@@ -26,6 +26,7 @@ data class Player(
     @SerializedName("id") val id: String,
     @SerializedName("display_name") val displayName: String,
     @SerializedName("primary_position") val primaryPosition: Position,
+    @SerializedName("age") val age: Int? = null,
     @SerializedName("is_active") val isActive: Boolean,
     @SerializedName("notes") val notes: String? = null,
     @SerializedName("created_at") val createdAt: String? = null,

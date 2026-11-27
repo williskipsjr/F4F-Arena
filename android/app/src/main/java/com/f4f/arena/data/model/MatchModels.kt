@@ -140,6 +140,28 @@ data class MatchVoteDetail(
     @SerializedName("voted_at") val votedAt: String
 )
 
+data class MatchComment(
+    @SerializedName("id") val id: String,
+    @SerializedName("match_id") val matchId: String,
+    @SerializedName("player_id") val playerId: String? = null,
+    @SerializedName("author_name") val authorName: String,
+    @SerializedName("author_role") val authorRole: String,
+    @SerializedName("message") val message: String,
+    @SerializedName("created_at") val createdAt: String
+)
+
+data class MatchCommentsResponse(
+    @SerializedName("data") val data: List<MatchComment>
+)
+
+data class MatchCommentResponse(
+    @SerializedName("data") val data: MatchComment
+)
+
+data class CreateCommentRequest(
+    @SerializedName("message") val message: String
+)
+
 data class MatchVotesResponse(
     @SerializedName("data") val data: List<MatchVoteDetail>
 )

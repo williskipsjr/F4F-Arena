@@ -99,27 +99,29 @@ object SessionManager {
 
     suspend fun register(
         displayName: String,
-        username: String,
         phone: String,
-        password: String,
-        playerId: String? = null
+        age: Int,
+        pin: String,
+        firebaseIdToken: String? = null
     ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val trimmedUser = username.trim()
+            val phoneDigits = phone.filter { it.isDigit() }
+            val derivedUser = if (phoneDigits.length >= 10) phoneDigits.takeLast(10) else displayName.trim().lowercase().replace(" ", "_")
             val response = NetworkClient.authApi.register(
                 RegisterRequest(
                     displayName = displayName.trim(),
-                    username = trimmedUser,
+                    username = derivedUser,
                     phone = phone.trim(),
-                    password = password,
-                    playerId = playerId
+                    age = age,
+                    password = pin,
+                    firebaseIdToken = firebaseIdToken
                 )
             )
             if (response.isSuccessful && response.body() != null) {
-                saveSession(trimmedUser, response.body()!!)
+                saveSession(derivedUser, response.body()!!)
                 Result.success(Unit)
             } else if (response.code() == 409) {
-                Result.failure(Exception("Username already taken. Try signing in instead."))
+                Result.failure(Exception("Phone number is already registered. Try signing in instead."))
             } else {
                 Result.failure(Exception("Sign up failed (HTTP ${response.code()})"))
             }

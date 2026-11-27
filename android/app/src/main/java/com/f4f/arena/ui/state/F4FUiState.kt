@@ -40,6 +40,7 @@ data class PlayerUi(
     val id: String,
     val name: String,
     val position: PlayerPosition,
+    val age: Int? = null,
     val isActive: Boolean = true,
     val notes: String = ""
 )
@@ -50,6 +51,14 @@ data class PollVoteUi(
     val position: PlayerPosition,
     val isIn: Boolean,
     val votedAtLabel: String
+)
+
+data class PollCommentUi(
+    val id: String,
+    val authorName: String,
+    val isAdmin: Boolean,
+    val message: String,
+    val createdAtLabel: String
 )
 
 data class MatchCardUi(

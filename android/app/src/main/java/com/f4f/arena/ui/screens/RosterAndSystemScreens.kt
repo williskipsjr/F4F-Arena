@@ -107,8 +107,9 @@ fun RosterScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(player.name, style = MaterialTheme.typography.titleMedium)
+                                val ageSuffix = player.age?.let { " · $it yrs" } ?: ""
                                 Text(
-                                    "${player.position.displayName} · ${if (player.isActive) "Active" else "Inactive"}",
+                                    "${player.position.displayName}$ageSuffix · ${if (player.isActive) "Active" else "Inactive"}",
                                     style = MaterialTheme.typography.labelMedium,
                                     color = F4FColors.TextSecondary
                                 )

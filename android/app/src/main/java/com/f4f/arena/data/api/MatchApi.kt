@@ -43,6 +43,25 @@ interface MatchApi {
         @Path("id") id: String
     ): Response<MatchVotesResponse>
 
+    @GET("api/v1/matches/{id}/comments")
+    suspend fun getMatchComments(
+        @Path("id") id: String
+    ): Response<MatchCommentsResponse>
+
+    @POST("api/v1/matches/{id}/comments")
+    suspend fun postMatchComment(
+        @Header("Authorization") bearerToken: String,
+        @Path("id") id: String,
+        @Body request: CreateCommentRequest
+    ): Response<MatchCommentResponse>
+
+    @DELETE("api/v1/matches/{id}/comments/{commentId}")
+    suspend fun deleteMatchComment(
+        @Header("Authorization") bearerToken: String,
+        @Path("id") id: String,
+        @Path("commentId") commentId: String
+    ): Response<Unit>
+
     @GET("api/v1/matches/{id}")
     suspend fun getMatch(
         @Path("id") id: String
