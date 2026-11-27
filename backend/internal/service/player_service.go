@@ -78,6 +78,9 @@ func (s *PlayerService) UpdatePlayer(ctx context.Context, id string, input domai
 	if input.PrimaryPosition != nil {
 		existing.PrimaryPosition = *input.PrimaryPosition
 	}
+	if input.Age != nil {
+		existing.Age = input.Age
+	}
 	if input.IsActive != nil {
 		existing.IsActive = *input.IsActive
 	}

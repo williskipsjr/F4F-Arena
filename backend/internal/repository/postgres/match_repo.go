@@ -425,6 +425,65 @@ func (r *MatchRepository) GetMatchVotes(ctx context.Context, matchID string) ([]
 	return votes, nil
 }
 
+// ListComments returns all comments/notes on a match ordered chronologically.
+func (r *MatchRepository) ListComments(ctx context.Context, matchID string) ([]domain.MatchComment, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, match_id, player_id, author_name, author_role, message, created_at
+		FROM match_comments
+		WHERE match_id = $1
+		ORDER BY created_at ASC
+	`, matchID)
+	if err != nil {
+		return nil, fmt.Errorf("failed fetching match comments: %w", err)
+	}
+	defer rows.Close()
+
+	comments := make([]domain.MatchComment, 0)
+	for rows.Next() {
+		var c domain.MatchComment
+		if err := rows.Scan(&c.ID, &c.MatchID, &c.PlayerID, &c.AuthorName, &c.AuthorRole, &c.Message, &c.CreatedAt); err != nil {
+			return nil, fmt.Errorf("failed scanning match comment: %w", err)
+		}
+		comments = append(comments, c)
+	}
+	return comments, nil
+}
+
+// CreateComment posts a new comment/note on a match poll.
+func (r *MatchRepository) CreateComment(ctx context.Context, matchID string, playerID *string, authorName, authorRole, message string) (*domain.MatchComment, error) {
+	trimmed := strings.TrimSpace(message)
+	if trimmed == "" {
+		return nil, fmt.Errorf("comment message cannot be empty")
+	}
+	if authorRole == "" {
+		authorRole = "PLAYER"
+	}
+	var c domain.MatchComment
+	err := r.pool.QueryRow(ctx, `
+		INSERT INTO match_comments (match_id, player_id, author_name, author_role, message)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id, match_id, player_id, author_name, author_role, message, created_at
+	`, matchID, playerID, authorName, authorRole, trimmed).Scan(
+		&c.ID, &c.MatchID, &c.PlayerID, &c.AuthorName, &c.AuthorRole, &c.Message, &c.CreatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed posting comment: %w", err)
+	}
+	return &c, nil
+}
+
+// DeleteComment removes a comment by ID (admin moderation).
+func (r *MatchRepository) DeleteComment(ctx context.Context, matchID, commentID string) error {
+	tag, err := r.pool.Exec(ctx, `DELETE FROM match_comments WHERE id = $1 AND match_id = $2`, commentID, matchID)
+	if err != nil {
+		return fmt.Errorf("failed deleting comment: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrMatchNotFound
+	}
+	return nil
+}
+
 // EnsureAdminPlayerID resolves or creates a player profile for the admin account.
 func (r *MatchRepository) EnsureAdminPlayerID(ctx context.Context, adminName string) (string, error) {
 	name := strings.TrimSpace(adminName)

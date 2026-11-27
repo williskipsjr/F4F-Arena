@@ -284,3 +284,75 @@ func (h *MatchHandler) GetVotes(w http.ResponseWriter, r *http.Request) {
 		"data": votes,
 	})
 }
+
+func (h *MatchHandler) GetComments(w http.ResponseWriter, r *http.Request) {
+	if h.voteRepo == nil {
+		writeError(w, http.StatusServiceUnavailable, "DB_UNAVAILABLE", "Comments unavailable")
+		return
+	}
+	matchID := chi.URLParam(r, "id")
+	comments, err := h.voteRepo.ListComments(r.Context(), matchID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to fetch comments: "+err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"data": comments,
+	})
+}
+
+func (h *MatchHandler) PostComment(w http.ResponseWriter, r *http.Request) {
+	if h.voteRepo == nil {
+		writeError(w, http.StatusServiceUnavailable, "DB_UNAVAILABLE", "Comments unavailable")
+		return
+	}
+	claims, _ := r.Context().Value(auth.AdminContextKey).(*auth.Claims)
+	if claims == nil {
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication required")
+		return
+	}
+
+	matchID := chi.URLParam(r, "id")
+	var input domain.CreateCommentInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "Invalid JSON request body")
+		return
+	}
+
+	var playerIDPtr *string
+	if claims.PlayerID != "" {
+		pid := claims.PlayerID
+		playerIDPtr = &pid
+	}
+	authorName := claims.Username
+	if strings.EqualFold(claims.Role, "ADMIN") {
+		authorName = "Admin"
+	}
+
+	comment, err := h.voteRepo.CreateComment(r.Context(), matchID, playerIDPtr, authorName, claims.Role, input.Message)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
+		"data": comment,
+	})
+}
+
+func (h *MatchHandler) DeleteComment(w http.ResponseWriter, r *http.Request) {
+	if h.voteRepo == nil {
+		writeError(w, http.StatusServiceUnavailable, "DB_UNAVAILABLE", "Comments unavailable")
+		return
+	}
+	matchID := chi.URLParam(r, "id")
+	commentID := chi.URLParam(r, "commentId")
+	if err := h.voteRepo.DeleteComment(r.Context(), matchID, commentID); err != nil {
+		if errors.Is(err, postgres.ErrMatchNotFound) {
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "Comment not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to delete comment: "+err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"deleted": true})
+}

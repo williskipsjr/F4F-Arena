@@ -190,6 +190,20 @@ type MatchVoteDetail struct {
 	VotedAt         time.Time `json:"voted_at"`
 }
 
+type MatchComment struct {
+	ID         string    `json:"id"`
+	MatchID    string    `json:"match_id"`
+	PlayerID   *string   `json:"player_id,omitempty"`
+	AuthorName string    `json:"author_name"`
+	AuthorRole string    `json:"author_role"`
+	Message    string    `json:"message"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+type CreateCommentInput struct {
+	Message string `json:"message"`
+}
+
 type SyncAttendeesInput struct {
 	PlayerIDs []string `json:"player_ids"`
 }

@@ -27,7 +27,7 @@ func NewPlayerRepository(pool *pgxpool.Pool) *PlayerRepository {
 func (r *PlayerRepository) List(ctx context.Context, filter domain.PlayerFilter) ([]domain.Player, error) {
 	queryBuilder := strings.Builder{}
 	queryBuilder.WriteString(`
-		SELECT id, display_name, primary_position, is_active, notes, created_at, updated_at
+		SELECT id, display_name, primary_position, age, is_active, notes, created_at, updated_at
 		FROM players
 		WHERE 1=1
 	`)
@@ -69,6 +69,7 @@ func (r *PlayerRepository) List(ctx context.Context, filter domain.PlayerFilter)
 			&p.ID,
 			&p.DisplayName,
 			&posStr,
+			&p.Age,
 			&p.IsActive,
 			&p.Notes,
 			&p.CreatedAt,
@@ -90,7 +91,7 @@ func (r *PlayerRepository) List(ctx context.Context, filter domain.PlayerFilter)
 
 func (r *PlayerRepository) GetByID(ctx context.Context, id string) (*domain.Player, error) {
 	query := `
-		SELECT id, display_name, primary_position, is_active, notes, created_at, updated_at
+		SELECT id, display_name, primary_position, age, is_active, notes, created_at, updated_at
 		FROM players
 		WHERE id = $1
 	`
@@ -100,6 +101,7 @@ func (r *PlayerRepository) GetByID(ctx context.Context, id string) (*domain.Play
 		&p.ID,
 		&p.DisplayName,
 		&posStr,
+		&p.Age,
 		&p.IsActive,
 		&p.Notes,
 		&p.CreatedAt,
@@ -117,8 +119,8 @@ func (r *PlayerRepository) GetByID(ctx context.Context, id string) (*domain.Play
 
 func (r *PlayerRepository) Create(ctx context.Context, p *domain.Player) error {
 	query := `
-		INSERT INTO players (display_name, primary_position, is_active, notes, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO players (display_name, primary_position, age, is_active, notes, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id, created_at, updated_at
 	`
 	now := time.Now().UTC()
@@ -127,6 +129,7 @@ func (r *PlayerRepository) Create(ctx context.Context, p *domain.Player) error {
 		query,
 		p.DisplayName,
 		string(p.PrimaryPosition),
+		p.Age,
 		p.IsActive,
 		p.Notes,
 		now,
@@ -142,8 +145,8 @@ func (r *PlayerRepository) Create(ctx context.Context, p *domain.Player) error {
 func (r *PlayerRepository) Update(ctx context.Context, p *domain.Player) error {
 	query := `
 		UPDATE players
-		SET display_name = $1, primary_position = $2, is_active = $3, notes = $4, updated_at = $5
-		WHERE id = $6
+		SET display_name = $1, primary_position = $2, age = $3, is_active = $4, notes = $5, updated_at = $6
+		WHERE id = $7
 		RETURNING updated_at
 	`
 	now := time.Now().UTC()
@@ -152,6 +155,7 @@ func (r *PlayerRepository) Update(ctx context.Context, p *domain.Player) error {
 		query,
 		p.DisplayName,
 		string(p.PrimaryPosition),
+		p.Age,
 		p.IsActive,
 		p.Notes,
 		now,

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/williskipsjr/f4f-arena/backend/internal/auth"
-	"github.com/williskipsjr/f4f-arena/backend/internal/domain"
 	"github.com/williskipsjr/f4f-arena/backend/internal/repository/postgres"
 )
 
@@ -19,12 +18,12 @@ type LoginRequest struct {
 }
 
 type RegisterRequest struct {
-	DisplayName     string           `json:"display_name"`
-	Username        string           `json:"username"`
-	Phone           string           `json:"phone"`
-	Password        string           `json:"password"`
-	PrimaryPosition *domain.Position `json:"primary_position,omitempty"`
-	PlayerID        *string          `json:"player_id,omitempty"`
+	DisplayName     string  `json:"display_name"`
+	Username        string  `json:"username"`
+	Phone           string  `json:"phone"`
+	Age             *int    `json:"age,omitempty"`
+	Password        string  `json:"password"`
+	FirebaseIDToken string  `json:"firebase_id_token,omitempty"`
 }
 
 type ResetPinRequest struct {
@@ -79,15 +78,10 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pos := domain.PositionMidfielder
-	if req.PrimaryPosition != nil && req.PrimaryPosition.IsValid() {
-		pos = *req.PrimaryPosition
-	}
-
-	info, err := h.accountRepo.RegisterPlayer(r.Context(), req.DisplayName, req.Username, req.Phone, req.Password, pos, req.PlayerID)
+	info, err := h.accountRepo.RegisterPlayer(r.Context(), req.DisplayName, req.Username, req.Phone, req.Password, req.Age)
 	if err != nil {
 		if errors.Is(err, postgres.ErrUsernameTaken) {
-			writeError(w, http.StatusConflict, "USERNAME_TAKEN", "Username is already registered")
+			writeError(w, http.StatusConflict, "USERNAME_TAKEN", "Phone number or username is already registered")
 			return
 		}
 		writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", err.Error())

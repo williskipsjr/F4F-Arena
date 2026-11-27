@@ -118,6 +118,7 @@ func main() {
 		r.Get("/api/v1/matches/{id}", matchHandler.Get)
 		r.Get("/api/v1/matches/{id}/attendees", matchHandler.GetAttendees)
 		r.Get("/api/v1/matches/{id}/votes", matchHandler.GetVotes)
+		r.Get("/api/v1/matches/{id}/comments", matchHandler.GetComments)
 	}
 	if teamHandler != nil {
 		r.Get("/api/v1/matches/{id}/teams", teamHandler.GetTeams)
@@ -136,6 +137,7 @@ func main() {
 		authed.Post("/api/v1/auth/change-password", authHandler.ChangePassword)
 		if matchHandler != nil {
 			authed.Post("/api/v1/matches/{id}/vote", matchHandler.CastVote)
+			authed.Post("/api/v1/matches/{id}/comments", matchHandler.PostComment)
 		}
 		if feedbackHandler != nil {
 			authed.Post("/api/v1/feedback", feedbackHandler.Create)
@@ -155,6 +157,7 @@ func main() {
 				admin.Post("/api/v1/matches", matchHandler.Create)
 				admin.Patch("/api/v1/matches/{id}", matchHandler.Update)
 				admin.Delete("/api/v1/matches/{id}", matchHandler.Delete)
+				admin.Delete("/api/v1/matches/{id}/comments/{commentId}", matchHandler.DeleteComment)
 				admin.Put("/api/v1/matches/{id}/attendees", matchHandler.SyncAttendees)
 				admin.Post("/api/v1/matches/{id}/attendees/late", matchHandler.AddLateArrival)
 				admin.Delete("/api/v1/matches/{id}/attendees/{playerId}", matchHandler.RemoveAttendee)
