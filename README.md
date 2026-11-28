@@ -18,12 +18,13 @@ F4F Arena replaces manual WhatsApp list-counting and ad-hoc team picking with a 
 
 ## Core Features
 
-- **Player Roster Management** — Maintains the community roster (seeded with 42 initial players across `KEEPER`, `DEFENDER`, `MIDFIELDER`, and `STRIKER`), active/inactive status, and quick guest additions on match day.
-- **Match Setup & Live Attendance** — Supports `6-a-side` (1-2-2-1), `7-a-side` (1-3-2-1), and `9-a-side` (1-3-3-2) formats with live headcount, suggested team count, substitute count, and goalkeeper deficit indicators.
-- **Position-Aware Matchmaking Engine** — Standalone pure Go package (`internal/matchmaker`) that balances natural positions across teams, distributes goalkeepers round-robin, flags missing keepers (`Needs Emergency GK`) without forcing outfielders into goal, and supports both `STRICT_SUBSTITUTES` (rotating bench) and `DISTRIBUTE_ALL` remainder policies.
-- **Interactive Team Review & Editing** — Tap-to-swap players across teams or the bench, move players directly (including late arrivals), track manual overrides, and lock final teams (`FINALISED`).
-- **WhatsApp Export** — Generates a plain-text WhatsApp message grouped by position (with optional bib colours, emergency keeper tags, and substitutes) from both the API and offline Android UI state, with one-tap clipboard copy and Android share sheet support.
-- **Admin JWT Authentication** — Public read access for viewing rosters, matches, and teams; server-side credentials issuing short-lived Bearer JWTs for all mutations.
+- **Phone-First Onboarding & PIN Auth** — Players enter their phone number to instantly see `"Welcome, <Name>!"` from the pre-seeded community roster (or quick sign-up with Name, Phone, Age & 4-digit PIN), with phone-verified PIN reset and in-app password/PIN rotation.
+- **Admin-Only Roster & Position Control** — The **Roster** tab is restricted to Admins, who manage players, assign/edit playing positions (`KEEPER`, `DEFENDER`, `MIDFIELDER`, `STRIKER`), active status, and emoji avatars.
+- **Live Match Polls & Comments** — Open polls with automatic match timelines (`Starting at ...`, `ONGOING`, `Match ended ...`), `YES (IN)` / `NO (OUT)` counts, and a poll comments thread where Admin announcements display an **`ADMIN`** capsule badge.
+- **All Formats + Smart Auto Even-Team Engine** — Supports `5-a-side` through `11-a-side` (`5v5`, `6v6`, `7v7`, `8v8`, `9v9`, `10v10`, `11v11`) plus an **Auto** mode that selects even team counts (`2`, `4`, `6`, ...) from attendance, while always honoring the Admin's explicit format & check-in list.
+- **Football Pitch Lineup Card & Team Editing** — Toggle between a 2D **Pitch Lineup** formation card and **Squad List**, tap-to-swap or move players across teams/bench, reshuffle, finalise squads, and export to WhatsApp.
+- **Post-Match Photos & Turf Fee Split** — Admins can attach a post-match squad photo (camera or gallery) and enter the total turf fee to automatically calculate and display the per-player split.
+- **In-App APK Updater** — Checks `GET /api/v1/app/version` and downloads & launches the signed GitHub Releases APK update directly inside the app with a live progress bar.
 
 ---
 
@@ -176,7 +177,8 @@ go test -v -race ./...
 
 ## Production Deployment
 
-Production deployment uses `deployments/docker-compose.prod.yml` with Caddy 2 handling automatic HTTPS certificates and `deployments/scripts/backup_db.sh` handling daily gzipped database backups.
+- **Cloud (Render + Neon PostgreSQL)** — Zero-cost cloud hosting using `backend/Dockerfile` on [Render](https://render.com) (respects `PORT` automatically), serverless PostgreSQL on [Neon](https://neon.tech), and signed APK distribution via **GitHub Releases** + in-app updater (`APP_LATEST_VERSION_CODE`, `APP_LATEST_VERSION_NAME`, `APP_DOWNLOAD_URL`, `APP_RELEASE_NOTES`).
+- **Self-Hosted VPS (Docker + Caddy 2)** — Uses `deployments/docker-compose.prod.yml` with Caddy 2 handling automatic HTTPS certificates and `deployments/scripts/backup_db.sh` handling daily gzipped database backups.
 
 - Full VPS setup, migration, and backup cron instructions: [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md)
 - Match-day rehearsal and verification steps: [docs/PILOT_CHECKLIST.md](docs/PILOT_CHECKLIST.md)
