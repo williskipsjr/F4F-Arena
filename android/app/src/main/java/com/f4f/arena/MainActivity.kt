@@ -90,6 +90,8 @@ private fun F4FArenaApp(
     var votersMatch by remember { mutableStateOf<MatchCardUi?>(null) }
     var votersLoading by remember { mutableStateOf(false) }
     var votersList by remember { mutableStateOf<List<PollVoteUi>>(emptyList()) }
+    var commentsList by remember { mutableStateOf<List<PollCommentUi>>(emptyList()) }
+    var postingComment by remember { mutableStateOf(false) }
 
     var showAddPlayerDialog by remember { mutableStateOf(false) }
     var editingPlayer by remember { mutableStateOf<Player?>(null) }
@@ -279,12 +281,16 @@ private fun F4FArenaApp(
         votersMatch = card
         votersLoading = true
         votersList = emptyList()
+        commentsList = emptyList()
         matchViewModel.loadMatchVotes(card.id) { res ->
             votersLoading = false
             res.onSuccess { list -> votersList = list.map { it.toUi() } }
                 .onFailure { err ->
                     scope.launch { snackbarHostState.showSnackbar(err.localizedMessage ?: "Failed to load votes") }
                 }
+        }
+        matchViewModel.loadMatchComments(card.id) { res ->
+            res.onSuccess { list -> commentsList = list.map { it.toUi() } }
         }
     }
 
@@ -358,6 +364,19 @@ private fun F4FArenaApp(
                         onBack = { activeTeamBoardMatchId = null },
                         onPolicyChange = { newPolicy ->
                             teamBoardViewModel.generateTeams(activeTeamBoardMatchId!!, newPolicy.toApi())
+                        },
+                        onFormatChange = { newFormat ->
+                            teamBoardViewModel.generateTeams(
+                                matchId = activeTeamBoardMatchId!!,
+                                format = newFormat.toApi(),
+                                autoFormat = false
+                            )
+                        },
+                        onAutoFormat = {
+                            teamBoardViewModel.generateTeams(
+                                matchId = activeTeamBoardMatchId!!,
+                                autoFormat = true
+                            )
                         },
                         onReshuffle = {
                             teamBoardViewModel.generateTeams(activeTeamBoardMatchId!!)
@@ -472,6 +491,7 @@ private fun F4FArenaApp(
                                 onOpenTeams = { matchId -> activeTeamBoardMatchId = matchId },
                                 onOpenCheckIn = { matchId -> activeAttendanceMatchId = matchId },
                                 onEndMatch = { matchId -> matchViewModel.endMatch(matchId) },
+                                onDeleteMatch = { matchId -> matchViewModel.deleteMatch(matchId) },
                                 onSeeAllMatches = { selectedTab = F4FBottomTab.MATCHES },
                                 onCreateNewPoll = { showCreatePollModal = true }
                             )
@@ -492,7 +512,8 @@ private fun F4FArenaApp(
                                     allMatchCards.firstOrNull { it.id == matchId }?.let { openVotersForMatch(it) }
                                 },
                                 onOpenTeams = { matchId -> activeTeamBoardMatchId = matchId },
-                                onOpenCheckIn = { matchId -> activeAttendanceMatchId = matchId }
+                                onOpenCheckIn = { matchId -> activeAttendanceMatchId = matchId },
+                                onDeleteMatch = { matchId -> matchViewModel.deleteMatch(matchId) }
                             )
                         }
                     }
@@ -547,6 +568,15 @@ private fun F4FArenaApp(
                                 SessionManager.logout()
                                 skippedOnboarding = false
                                 matchViewModel.loadMatches()
+                            },
+                            onChangePassword = { currentPwd, newPwd, onResult ->
+                                scope.launch {
+                                    val res = SessionManager.changePassword(currentPwd, newPwd)
+                                    onResult(res)
+                                    res.onSuccess { msg ->
+                                        snackbarHostState.showSnackbar(msg)
+                                    }
+                                }
                             }
                         )
                     }
@@ -590,11 +620,11 @@ private fun F4FArenaApp(
                     }
                 }
             },
-            onSignUp = { name, user, phone, pin ->
+            onSignUp = { name, phone, age, pin, firebaseIdToken ->
                 scope.launch {
                     authLoading = true
                     authError = null
-                    val res = SessionManager.register(name, user, phone, pin)
+                    val res = SessionManager.register(name, phone, age, pin, firebaseIdToken)
                     authLoading = false
                     if (res.isSuccess) {
                         showAuthSheet = false
@@ -679,11 +709,40 @@ private fun F4FArenaApp(
     }
 
     if (votersMatch != null) {
+        val currentCard = votersMatch!!
         PollVotersSheet(
-            matchTitle = votersMatch!!.title,
+            matchTitle = currentCard.title,
             votes = votersList,
+            comments = commentsList,
             isLoading = votersLoading,
-            onRefresh = { openVotersForMatch(votersMatch!!) },
+            isLoggedIn = isLoggedIn,
+            isAdmin = isAdmin,
+            isPostingComment = postingComment,
+            onRefresh = { openVotersForMatch(currentCard) },
+            onPostComment = { msg ->
+                postingComment = true
+                matchViewModel.postMatchComment(currentCard.id, msg) { res ->
+                    postingComment = false
+                    res.onSuccess { created ->
+                        commentsList = commentsList + created.toUi()
+                    }.onFailure { err ->
+                        scope.launch { snackbarHostState.showSnackbar(err.localizedMessage ?: "Failed to post comment") }
+                    }
+                }
+            },
+            onDeleteComment = { cid ->
+                matchViewModel.deleteMatchComment(currentCard.id, cid) { res ->
+                    res.onSuccess {
+                        commentsList = commentsList.filterNot { it.id == cid }
+                    }.onFailure { err ->
+                        scope.launch { snackbarHostState.showSnackbar(err.localizedMessage ?: "Failed to delete comment") }
+                    }
+                }
+            },
+            onRequireSignIn = {
+                votersMatch = null
+                showAuthSheet = true
+            },
             onDismiss = { votersMatch = null }
         )
     }
@@ -735,15 +794,23 @@ private fun Position.toUi(): PlayerPosition = when (this) {
 }
 
 private fun ApiMatchFormat.toUi(): MatchFormat = when (this) {
+    ApiMatchFormat.FIVE_A_SIDE -> MatchFormat.FIVE_A_SIDE
     ApiMatchFormat.SIX_A_SIDE -> MatchFormat.SIX_A_SIDE
     ApiMatchFormat.SEVEN_A_SIDE -> MatchFormat.SEVEN_A_SIDE
+    ApiMatchFormat.EIGHT_A_SIDE -> MatchFormat.EIGHT_A_SIDE
     ApiMatchFormat.NINE_A_SIDE -> MatchFormat.NINE_A_SIDE
+    ApiMatchFormat.TEN_A_SIDE -> MatchFormat.TEN_A_SIDE
+    ApiMatchFormat.ELEVEN_A_SIDE -> MatchFormat.ELEVEN_A_SIDE
 }
 
 private fun MatchFormat.toApi(): ApiMatchFormat = when (this) {
+    MatchFormat.FIVE_A_SIDE -> ApiMatchFormat.FIVE_A_SIDE
     MatchFormat.SIX_A_SIDE -> ApiMatchFormat.SIX_A_SIDE
     MatchFormat.SEVEN_A_SIDE -> ApiMatchFormat.SEVEN_A_SIDE
+    MatchFormat.EIGHT_A_SIDE -> ApiMatchFormat.EIGHT_A_SIDE
     MatchFormat.NINE_A_SIDE -> ApiMatchFormat.NINE_A_SIDE
+    MatchFormat.TEN_A_SIDE -> ApiMatchFormat.TEN_A_SIDE
+    MatchFormat.ELEVEN_A_SIDE -> ApiMatchFormat.ELEVEN_A_SIDE
 }
 
 private fun SubstitutePolicy.toUi(): TeamPolicy = when (this) {
@@ -760,8 +827,17 @@ private fun Player.toUi(): PlayerUi = PlayerUi(
     id = id,
     name = displayName,
     position = primaryPosition.toUi(),
+    age = age,
     isActive = isActive,
     notes = notes ?: ""
+)
+
+private fun com.f4f.arena.data.model.MatchComment.toUi(): PollCommentUi = PollCommentUi(
+    id = id,
+    authorName = authorName,
+    isAdmin = authorRole.equals("ADMIN", ignoreCase = true),
+    message = message,
+    createdAtLabel = formatIsoTimestamp(createdAt)
 )
 
 private fun MatchVoteDetail.toUi(): PollVoteUi = PollVoteUi(

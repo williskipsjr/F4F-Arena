@@ -1,13 +1,14 @@
 package handler
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/williskipsjr/f4f-arena/backend/internal/auth"
-	"github.com/williskipsjr/f4f-arena/backend/internal/domain"
 	"github.com/williskipsjr/f4f-arena/backend/internal/repository/postgres"
 )
 
@@ -17,18 +18,23 @@ type LoginRequest struct {
 }
 
 type RegisterRequest struct {
-	DisplayName     string           `json:"display_name"`
-	Username        string           `json:"username"`
-	Phone           string           `json:"phone"`
-	Password        string           `json:"password"`
-	PrimaryPosition *domain.Position `json:"primary_position,omitempty"`
-	PlayerID        *string          `json:"player_id,omitempty"`
+	DisplayName     string  `json:"display_name"`
+	Username        string  `json:"username"`
+	Phone           string  `json:"phone"`
+	Age             *int    `json:"age,omitempty"`
+	Password        string  `json:"password"`
+	FirebaseIDToken string  `json:"firebase_id_token,omitempty"`
 }
 
 type ResetPinRequest struct {
 	Username    string `json:"username"`
 	Phone       string `json:"phone"`
 	NewPassword string `json:"new_password"`
+}
+
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
 }
 
 type LoginResponse struct {
@@ -72,15 +78,10 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pos := domain.PositionMidfielder
-	if req.PrimaryPosition != nil && req.PrimaryPosition.IsValid() {
-		pos = *req.PrimaryPosition
-	}
-
-	info, err := h.accountRepo.RegisterPlayer(r.Context(), req.DisplayName, req.Username, req.Phone, req.Password, pos, req.PlayerID)
+	info, err := h.accountRepo.RegisterPlayer(r.Context(), req.DisplayName, req.Username, req.Phone, req.Password, req.Age)
 	if err != nil {
 		if errors.Is(err, postgres.ErrUsernameTaken) {
-			writeError(w, http.StatusConflict, "USERNAME_TAKEN", "Username is already registered")
+			writeError(w, http.StatusConflict, "USERNAME_TAKEN", "Phone number or username is already registered")
 			return
 		}
 		writeError(w, http.StatusBadRequest, "VALIDATION_FAILED", err.Error())
@@ -115,28 +116,33 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 1. Check Admin credentials first
-	if req.Username == h.adminUsername && req.Password == h.adminPassword {
-		adminPlayerID := ""
+	// 1. Check Admin credentials first (DB-backed hash overrides env fallback once set)
+	if strings.EqualFold(strings.TrimSpace(req.Username), h.adminUsername) {
+		var (
+			adminPlayerID string
+			valid         bool
+		)
 		if h.accountRepo != nil {
-			if pid, err := h.accountRepo.EnsureAdminPlayer(r.Context(), req.Username); err == nil {
-				adminPlayerID = pid
-			}
+			adminPlayerID, valid, _ = h.accountRepo.VerifyAdminPassword(r.Context(), h.adminUsername, req.Password, h.adminPassword)
+		} else if h.adminPassword != "" && subtle.ConstantTimeCompare([]byte(req.Password), []byte(h.adminPassword)) == 1 {
+			valid = true
 		}
-		token, expiresAt, err := h.tokenService.GenerateTokenWithRole(req.Username, "ADMIN", adminPlayerID)
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to generate authorization token")
+		if valid {
+			token, expiresAt, err := h.tokenService.GenerateTokenWithRole(h.adminUsername, "ADMIN", adminPlayerID)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to generate authorization token")
+				return
+			}
+			writeJSON(w, http.StatusOK, LoginResponse{
+				Token:       token,
+				TokenType:   "Bearer",
+				ExpiresAt:   expiresAt.UTC(),
+				Role:        "ADMIN",
+				PlayerID:    adminPlayerID,
+				DisplayName: "Admin",
+			})
 			return
 		}
-		writeJSON(w, http.StatusOK, LoginResponse{
-			Token:       token,
-			TokenType:   "Bearer",
-			ExpiresAt:   expiresAt.UTC(),
-			Role:        "ADMIN",
-			PlayerID:    adminPlayerID,
-			DisplayName: "Admin",
-		})
-		return
 	}
 
 	// 2. Fall back to registered community player accounts
@@ -187,5 +193,44 @@ func (h *AuthHandler) ResetPin(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{
 		"status":  "ok",
 		"message": "PIN updated successfully",
+	})
+}
+
+func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	if h.accountRepo == nil {
+		writeError(w, http.StatusServiceUnavailable, "DB_UNAVAILABLE", "Database unavailable")
+		return
+	}
+	claims, _ := r.Context().Value(auth.AdminContextKey).(*auth.Claims)
+	if claims == nil || claims.Username == "" {
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication required")
+		return
+	}
+
+	var req ChangePasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "Invalid JSON request body")
+		return
+	}
+
+	if err := h.accountRepo.ChangePassword(
+		r.Context(),
+		claims.Username,
+		claims.Role,
+		req.CurrentPassword,
+		req.NewPassword,
+		h.adminPassword,
+	); err != nil {
+		if errors.Is(err, postgres.ErrInvalidCredentials) {
+			writeError(w, http.StatusUnauthorized, "INVALID_PASSWORD", "Current password is incorrect")
+			return
+		}
+		writeError(w, http.StatusBadRequest, "CHANGE_FAILED", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"status":  "ok",
+		"message": "Password updated successfully",
 	})
 }

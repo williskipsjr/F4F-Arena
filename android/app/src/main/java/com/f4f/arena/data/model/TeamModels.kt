@@ -3,7 +3,9 @@ package com.f4f.arena.data.model
 import com.google.gson.annotations.SerializedName
 
 data class GenerateTeamsRequest(
-    @SerializedName("sub_policy") val subPolicy: String? = null
+    @SerializedName("sub_policy") val subPolicy: String? = null,
+    @SerializedName("format") val format: String? = null,
+    @SerializedName("auto_format") val autoFormat: Boolean = false
 )
 
 data class SwapPlayersRequest(

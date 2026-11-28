@@ -13,14 +13,18 @@ var (
 type MatchFormat string
 
 const (
-	FormatSixASide   MatchFormat = "SIX_A_SIDE"
-	FormatSevenASide MatchFormat = "SEVEN_A_SIDE"
-	FormatNineASide  MatchFormat = "NINE_A_SIDE"
+	FormatFiveASide   MatchFormat = "FIVE_A_SIDE"
+	FormatSixASide    MatchFormat = "SIX_A_SIDE"
+	FormatSevenASide  MatchFormat = "SEVEN_A_SIDE"
+	FormatEightASide  MatchFormat = "EIGHT_A_SIDE"
+	FormatNineASide   MatchFormat = "NINE_A_SIDE"
+	FormatTenASide    MatchFormat = "TEN_A_SIDE"
+	FormatElevenASide MatchFormat = "ELEVEN_A_SIDE"
 )
 
 func (f MatchFormat) IsValid() bool {
 	switch f {
-	case FormatSixASide, FormatSevenASide, FormatNineASide:
+	case FormatFiveASide, FormatSixASide, FormatSevenASide, FormatEightASide, FormatNineASide, FormatTenASide, FormatElevenASide:
 		return true
 	default:
 		return false
@@ -29,12 +33,20 @@ func (f MatchFormat) IsValid() bool {
 
 func (f MatchFormat) PlayersPerTeam() int {
 	switch f {
+	case FormatFiveASide:
+		return 5
 	case FormatSixASide:
 		return 6
 	case FormatSevenASide:
 		return 7
+	case FormatEightASide:
+		return 8
 	case FormatNineASide:
 		return 9
+	case FormatTenASide:
+		return 10
+	case FormatElevenASide:
+		return 11
 	default:
 		return 7
 	}
@@ -176,6 +188,20 @@ type MatchVoteDetail struct {
 	PrimaryPosition Position  `json:"primary_position"`
 	Vote            string    `json:"vote"`
 	VotedAt         time.Time `json:"voted_at"`
+}
+
+type MatchComment struct {
+	ID         string    `json:"id"`
+	MatchID    string    `json:"match_id"`
+	PlayerID   *string   `json:"player_id,omitempty"`
+	AuthorName string    `json:"author_name"`
+	AuthorRole string    `json:"author_role"`
+	Message    string    `json:"message"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+type CreateCommentInput struct {
+	Message string `json:"message"`
 }
 
 type SyncAttendeesInput struct {

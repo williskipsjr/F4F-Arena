@@ -11,11 +11,21 @@ import kotlinx.coroutines.withContext
 class TeamRepository(
     private val teamApi: TeamApi
 ) {
-    suspend fun generateTeams(token: String, matchId: String, subPolicy: String? = null): Result<MatchTeamsData> =
+    suspend fun generateTeams(
+        token: String,
+        matchId: String,
+        subPolicy: String? = null,
+        format: String? = null,
+        autoFormat: Boolean = false
+    ): Result<MatchTeamsData> =
         withContext(Dispatchers.IO) {
             try {
                 val bearer = if (token.startsWith("Bearer ")) token else "Bearer $token"
-                val response = teamApi.generateTeams(bearer, matchId, GenerateTeamsRequest(subPolicy))
+                val response = teamApi.generateTeams(
+                    bearer,
+                    matchId,
+                    GenerateTeamsRequest(subPolicy = subPolicy, format = format, autoFormat = autoFormat)
+                )
                 if (response.isSuccessful && response.body() != null) {
                     Result.success(response.body()!!.data)
                 } else if (response.code() == 401) {

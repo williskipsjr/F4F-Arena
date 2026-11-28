@@ -144,6 +144,37 @@ class MatchViewModel(
         }
     }
 
+    fun loadMatchComments(
+        matchId: String,
+        onResult: (Result<List<com.f4f.arena.data.model.MatchComment>>) -> Unit
+    ) {
+        viewModelScope.launch {
+            onResult(repository.getMatchComments(matchId))
+        }
+    }
+
+    fun postMatchComment(
+        matchId: String,
+        message: String,
+        token: String = SessionManager.getBearerToken(),
+        onResult: (Result<com.f4f.arena.data.model.MatchComment>) -> Unit
+    ) {
+        viewModelScope.launch {
+            onResult(repository.postMatchComment(token, matchId, message))
+        }
+    }
+
+    fun deleteMatchComment(
+        matchId: String,
+        commentId: String,
+        token: String = SessionManager.getBearerToken(),
+        onResult: (Result<Unit>) -> Unit
+    ) {
+        viewModelScope.launch {
+            onResult(repository.deleteMatchComment(token, matchId, commentId))
+        }
+    }
+
     fun endMatch(
         matchId: String,
         token: String = SessionManager.getBearerToken()
@@ -164,6 +195,26 @@ class MatchViewModel(
                 val current = _uiState.value as? MatchUiState.Success ?: return@onFailure
                 _uiState.value = current.copy(actionMessage = err.localizedMessage ?: "Failed to end match")
             }
+        }
+    }
+
+    fun deleteMatch(
+        matchId: String,
+        token: String = SessionManager.getBearerToken()
+    ) {
+        viewModelScope.launch {
+            repository.deleteMatch(token, matchId)
+                .onSuccess {
+                    val current = _uiState.value as? MatchUiState.Success ?: return@onSuccess
+                    _uiState.value = current.copy(
+                        matches = current.matches.filterNot { it.id == matchId },
+                        actionMessage = "Poll deleted"
+                    )
+                }
+                .onFailure { err ->
+                    val current = _uiState.value as? MatchUiState.Success ?: return@onFailure
+                    _uiState.value = current.copy(actionMessage = err.localizedMessage ?: "Failed to delete poll")
+                }
         }
     }
 

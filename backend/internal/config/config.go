@@ -40,7 +40,7 @@ func Load() *Config {
 
 	adminPassphrase := getEnv("ADMIN_PASSPHRASE", "")
 	if adminPassphrase == "" {
-		adminPassphrase = getEnv("ADMIN_PASSWORD_HASH", "f4f_arena_secret_passphrase")
+		adminPassphrase = getEnv("ADMIN_PASSWORD_HASH", "")
 	}
 
 	latestVersionCode, err := strconv.Atoi(getEnv("APP_LATEST_VERSION_CODE", "1"))
@@ -48,8 +48,13 @@ func Load() *Config {
 		latestVersionCode = 1
 	}
 
+	serverPort := getEnv("SERVER_PORT", "")
+	if serverPort == "" {
+		serverPort = getEnv("PORT", "8080")
+	}
+
 	return &Config{
-		ServerPort:           getEnv("SERVER_PORT", "8080"),
+		ServerPort:           serverPort,
 		ServerEnv:            getEnv("SERVER_ENV", "development"),
 		DatabaseURL:          dbURL,
 		AdminUsername:        getEnv("ADMIN_USERNAME", "admin"),

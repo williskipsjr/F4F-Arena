@@ -5,19 +5,31 @@ import (
 )
 
 func TestMatchFormat(t *testing.T) {
+	if !FormatFiveASide.IsValid() || FormatFiveASide.PlayersPerTeam() != 5 {
+		t.Errorf("expected FIVE_A_SIDE to be 5 players")
+	}
 	if !FormatSixASide.IsValid() || FormatSixASide.PlayersPerTeam() != 6 {
 		t.Errorf("expected SIX_A_SIDE to be 6 players")
 	}
 	if !FormatSevenASide.IsValid() || FormatSevenASide.PlayersPerTeam() != 7 {
 		t.Errorf("expected SEVEN_A_SIDE to be 7 players")
 	}
+	if !FormatEightASide.IsValid() || FormatEightASide.PlayersPerTeam() != 8 {
+		t.Errorf("expected EIGHT_A_SIDE to be 8 players")
+	}
 	if !FormatNineASide.IsValid() || FormatNineASide.PlayersPerTeam() != 9 {
 		t.Errorf("expected NINE_A_SIDE to be 9 players")
 	}
+	if !FormatTenASide.IsValid() || FormatTenASide.PlayersPerTeam() != 10 {
+		t.Errorf("expected TEN_A_SIDE to be 10 players")
+	}
+	if !FormatElevenASide.IsValid() || FormatElevenASide.PlayersPerTeam() != 11 {
+		t.Errorf("expected ELEVEN_A_SIDE to be 11 players")
+	}
 
-	invalidFormat := MatchFormat("ELEVEN_A_SIDE")
+	invalidFormat := MatchFormat("TWELVE_A_SIDE")
 	if invalidFormat.IsValid() {
-		t.Error("expected ELEVEN_A_SIDE to be invalid")
+		t.Error("expected TWELVE_A_SIDE to be invalid")
 	}
 }
 

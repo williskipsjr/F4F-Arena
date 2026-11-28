@@ -61,6 +61,24 @@ class MatchRepository(
             }
         }
 
+    suspend fun deleteMatch(token: String, id: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            try {
+                val bearer = if (token.startsWith("Bearer ")) token else "Bearer $token"
+                val response = matchApi.deleteMatch(bearer, id)
+                if (response.isSuccessful) {
+                    Result.success(Unit)
+                } else if (response.code() == 401) {
+                    com.f4f.arena.data.auth.SessionManager.onUnauthorized()
+                    Result.failure(Exception("Admin sign-in required (HTTP 401)"))
+                } else {
+                    Result.failure(Exception("Failed to delete poll: HTTP ${response.code()}"))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
     suspend fun castVote(token: String, matchId: String, vote: String): Result<Match> =
         withContext(Dispatchers.IO) {
             try {
@@ -87,6 +105,53 @@ class MatchRepository(
                     Result.success(response.body()!!.data)
                 } else {
                     Result.failure(Exception("Failed to load votes: HTTP ${response.code()}"))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    suspend fun getMatchComments(matchId: String): Result<List<MatchComment>> =
+        withContext(Dispatchers.IO) {
+            try {
+                val response = matchApi.getMatchComments(matchId)
+                if (response.isSuccessful && response.body() != null) {
+                    Result.success(response.body()!!.data)
+                } else {
+                    Result.failure(Exception("Failed to load comments: HTTP ${response.code()}"))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    suspend fun postMatchComment(token: String, matchId: String, message: String): Result<MatchComment> =
+        withContext(Dispatchers.IO) {
+            try {
+                val bearer = if (token.startsWith("Bearer ")) token else "Bearer $token"
+                val response = matchApi.postMatchComment(bearer, matchId, CreateCommentRequest(message))
+                if (response.isSuccessful && response.body() != null) {
+                    Result.success(response.body()!!.data)
+                } else if (response.code() == 401) {
+                    com.f4f.arena.data.auth.SessionManager.onUnauthorized()
+                    Result.failure(Exception("Please sign in to comment (HTTP 401)"))
+                } else {
+                    Result.failure(Exception("Failed to post comment: HTTP ${response.code()}"))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    suspend fun deleteMatchComment(token: String, matchId: String, commentId: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            try {
+                val bearer = if (token.startsWith("Bearer ")) token else "Bearer $token"
+                val response = matchApi.deleteMatchComment(bearer, matchId, commentId)
+                if (response.isSuccessful) {
+                    Result.success(Unit)
+                } else {
+                    Result.failure(Exception("Failed to delete comment: HTTP ${response.code()}"))
                 }
             } catch (e: Exception) {
                 Result.failure(e)

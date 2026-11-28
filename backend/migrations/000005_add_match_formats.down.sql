@@ -1,0 +1,1 @@
+-- PostgreSQL enum values cannot be dropped directly without recreating the type.

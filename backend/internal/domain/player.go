@@ -28,6 +28,7 @@ type Player struct {
 	ID              string    `json:"id"`
 	DisplayName     string    `json:"display_name"`
 	PrimaryPosition Position  `json:"primary_position"`
+	Age             *int      `json:"age,omitempty"`
 	IsActive        bool      `json:"is_active"`
 	Notes           *string   `json:"notes,omitempty"`
 	CreatedAt       time.Time `json:"created_at"`
@@ -66,6 +67,7 @@ type CreatePlayerInput struct {
 type UpdatePlayerInput struct {
 	DisplayName     *string   `json:"display_name,omitempty"`
 	PrimaryPosition *Position `json:"primary_position,omitempty"`
+	Age             *int      `json:"age,omitempty"`
 	IsActive        *bool     `json:"is_active,omitempty"`
 	Notes           *string   `json:"notes,omitempty"`
 }

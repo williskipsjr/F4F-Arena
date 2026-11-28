@@ -10,9 +10,13 @@ enum class PlayerPosition(val shortCode: String, val displayName: String) {
 }
 
 enum class MatchFormat(val size: Int, val label: String, val formation: String) {
+    FIVE_A_SIDE(5, "5-a-side", "1 GK · 2 DEF · 1 MID · 1 STR"),
     SIX_A_SIDE(6, "6-a-side", "1 GK · 2 DEF · 2 MID · 1 STR"),
     SEVEN_A_SIDE(7, "7-a-side", "1 GK · 3 DEF · 2 MID · 1 STR"),
-    NINE_A_SIDE(9, "9-a-side", "1 GK · 3 DEF · 3 MID · 2 STR");
+    EIGHT_A_SIDE(8, "8-a-side", "1 GK · 3 DEF · 3 MID · 1 STR"),
+    NINE_A_SIDE(9, "9-a-side", "1 GK · 3 DEF · 3 MID · 2 STR"),
+    TEN_A_SIDE(10, "10-a-side", "1 GK · 4 DEF · 3 MID · 2 STR"),
+    ELEVEN_A_SIDE(11, "11-a-side", "1 GK · 4 DEF · 4 MID · 2 STR");
 
     fun mathSummary(playerCount: Int): String {
         val teams = playerCount / size
@@ -36,6 +40,7 @@ data class PlayerUi(
     val id: String,
     val name: String,
     val position: PlayerPosition,
+    val age: Int? = null,
     val isActive: Boolean = true,
     val notes: String = ""
 )
@@ -46,6 +51,14 @@ data class PollVoteUi(
     val position: PlayerPosition,
     val isIn: Boolean,
     val votedAtLabel: String
+)
+
+data class PollCommentUi(
+    val id: String,
+    val authorName: String,
+    val isAdmin: Boolean,
+    val message: String,
+    val createdAtLabel: String
 )
 
 data class MatchCardUi(

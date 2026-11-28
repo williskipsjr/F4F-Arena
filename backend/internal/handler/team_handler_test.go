@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/williskipsjr/f4f-arena/backend/internal/domain"
 	"github.com/williskipsjr/f4f-arena/backend/internal/matchmaker"
+	"github.com/williskipsjr/f4f-arena/backend/internal/service"
 )
 
 type mockTeamService struct {
@@ -27,6 +28,10 @@ func (m *mockTeamService) GenerateTeams(ctx context.Context, matchID string, sub
 		return m.generateFn(ctx, matchID, subPolicyOverride)
 	}
 	return nil, domain.ErrMatchNotFound
+}
+
+func (m *mockTeamService) GenerateTeamsWithOptions(ctx context.Context, matchID string, opts service.GenerateTeamsOptions) (*domain.MatchTeamsResponse, error) {
+	return m.GenerateTeams(ctx, matchID, opts.SubPolicy)
 }
 
 func (m *mockTeamService) GetTeams(ctx context.Context, matchID string) (*domain.MatchTeamsResponse, error) {

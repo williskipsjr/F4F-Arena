@@ -126,6 +126,9 @@ func (m *mockMatchStoreForTeam) AddLateAttendee(ctx context.Context, matchID str
 func (m *mockMatchStoreForTeam) RemoveAttendee(ctx context.Context, matchID string, playerID string) error {
 	return nil
 }
+func (m *mockMatchStoreForTeam) Delete(ctx context.Context, id string) error {
+	return nil
+}
 
 func makeAttendees(gk, def, mid, str int) []domain.MatchAttendee {
 	var att []domain.MatchAttendee

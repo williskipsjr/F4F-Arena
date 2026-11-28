@@ -3,14 +3,26 @@ package com.f4f.arena.data.model
 import com.google.gson.annotations.SerializedName
 
 enum class MatchFormat(val label: String, val templateDescription: String, val playersPerTeam: Int) {
+    @SerializedName("FIVE_A_SIDE")
+    FIVE_A_SIDE("5-a-side", "1 GK • 2 DEF • 1 MID • 1 STR", 5),
+
     @SerializedName("SIX_A_SIDE")
     SIX_A_SIDE("6-a-side", "1 GK • 2 DEF • 2 MID • 1 STR", 6),
 
     @SerializedName("SEVEN_A_SIDE")
     SEVEN_A_SIDE("7-a-side", "1 GK • 3 DEF • 2 MID • 1 STR", 7),
 
+    @SerializedName("EIGHT_A_SIDE")
+    EIGHT_A_SIDE("8-a-side", "1 GK • 3 DEF • 3 MID • 1 STR", 8),
+
     @SerializedName("NINE_A_SIDE")
-    NINE_A_SIDE("9-a-side", "1 GK • 3 DEF • 3 MID • 2 STR", 9);
+    NINE_A_SIDE("9-a-side", "1 GK • 3 DEF • 3 MID • 2 STR", 9),
+
+    @SerializedName("TEN_A_SIDE")
+    TEN_A_SIDE("10-a-side", "1 GK • 4 DEF • 3 MID • 2 STR", 10),
+
+    @SerializedName("ELEVEN_A_SIDE")
+    ELEVEN_A_SIDE("11-a-side", "1 GK • 4 DEF • 4 MID • 2 STR", 11);
 
     companion object {
         fun fromString(str: String): MatchFormat {
@@ -126,6 +138,28 @@ data class MatchVoteDetail(
     @SerializedName("primary_position") val primaryPosition: Position,
     @SerializedName("vote") val vote: String,
     @SerializedName("voted_at") val votedAt: String
+)
+
+data class MatchComment(
+    @SerializedName("id") val id: String,
+    @SerializedName("match_id") val matchId: String,
+    @SerializedName("player_id") val playerId: String? = null,
+    @SerializedName("author_name") val authorName: String,
+    @SerializedName("author_role") val authorRole: String,
+    @SerializedName("message") val message: String,
+    @SerializedName("created_at") val createdAt: String
+)
+
+data class MatchCommentsResponse(
+    @SerializedName("data") val data: List<MatchComment>
+)
+
+data class MatchCommentResponse(
+    @SerializedName("data") val data: MatchComment
+)
+
+data class CreateCommentRequest(
+    @SerializedName("message") val message: String
 )
 
 data class MatchVotesResponse(

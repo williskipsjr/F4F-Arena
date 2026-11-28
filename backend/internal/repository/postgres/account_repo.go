@@ -40,25 +40,28 @@ func NewAccountRepository(pool *pgxpool.Pool) *AccountRepository {
 func (r *AccountRepository) RegisterPlayer(
 	ctx context.Context,
 	displayName, username, phone, password string,
-	position domain.Position,
-	claimedPlayerID *string,
+	age *int,
 ) (*PlayerAccountInfo, error) {
 	trimmedName := strings.TrimSpace(displayName)
+	cleanPhone := normalizePhone(phone)
 	trimmedUser := strings.ToLower(strings.TrimSpace(username))
-	if trimmedUser == "" && trimmedName != "" {
+	if trimmedUser == "" && len(cleanPhone) >= 10 {
+		trimmedUser = cleanPhone[len(cleanPhone)-10:]
+	} else if trimmedUser == "" && trimmedName != "" {
 		trimmedUser = strings.ToLower(strings.ReplaceAll(trimmedName, " ", "_"))
 	}
-	cleanPhone := normalizePhone(phone)
 	if trimmedName == "" || trimmedUser == "" || len(password) < 4 {
-		return nil, errors.New("display_name, username, and PIN/password (min 4 chars) are required")
+		return nil, errors.New("name, phone number, and 4-digit PIN are required")
 	}
 	if len(cleanPhone) < 10 {
 		return nil, errors.New("valid phone number (at least 10 digits) is required")
 	}
-
-	if !position.IsValid() {
-		position = domain.PositionMidfielder
+	if age == nil || *age < 10 || *age > 80 {
+		return nil, errors.New("valid age (10–80) is required")
 	}
+
+	// Only Admin assigns/edits player positions; new self-registered players default to MIDFIELDER
+	defaultPosition := domain.PositionMidfielder
 
 	hash, err := hashPassword(password)
 	if err != nil {
@@ -72,7 +75,7 @@ func (r *AccountRepository) RegisterPlayer(
 	defer tx.Rollback(ctx)
 
 	var existingID string
-	err = tx.QueryRow(ctx, "SELECT id FROM player_accounts WHERE username = $1", trimmedUser).Scan(&existingID)
+	err = tx.QueryRow(ctx, "SELECT id FROM player_accounts WHERE username = $1 OR phone = $2", trimmedUser, cleanPhone).Scan(&existingID)
 	if err == nil {
 		return nil, ErrUsernameTaken
 	}
@@ -80,44 +83,15 @@ func (r *AccountRepository) RegisterPlayer(
 		return nil, fmt.Errorf("failed checking username: %w", err)
 	}
 
-	// Link to claimed player_id if provided & unclaimed, else match display_name, else create new player
 	var playerID string
 	now := time.Now().UTC()
-	if claimedPlayerID != nil && strings.TrimSpace(*claimedPlayerID) != "" {
-		cid := strings.TrimSpace(*claimedPlayerID)
-		var existingAcc string
-		err = tx.QueryRow(ctx, "SELECT id FROM player_accounts WHERE player_id = $1", cid).Scan(&existingAcc)
-		if err == nil {
-			return nil, errors.New("this player profile has already been claimed — please sign in")
-		}
-		if !errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("failed checking claimed player: %w", err)
-		}
-		err = tx.QueryRow(ctx, "SELECT id, display_name FROM players WHERE id = $1", cid).Scan(&playerID, &trimmedName)
-		if err != nil {
-			return nil, fmt.Errorf("selected player not found")
-		}
-	} else {
-		err = tx.QueryRow(ctx, `
-			SELECT p.id
-			FROM players p
-			LEFT JOIN player_accounts pa ON pa.player_id = p.id
-			WHERE LOWER(p.display_name) = LOWER($1) AND pa.id IS NULL
-			LIMIT 1
-		`, trimmedName).Scan(&playerID)
-
-		if errors.Is(err, pgx.ErrNoRows) {
-			err = tx.QueryRow(ctx, `
-				INSERT INTO players (display_name, primary_position, is_active, created_at, updated_at)
-				VALUES ($1, $2, true, $3, $3)
-				RETURNING id
-			`, trimmedName, string(position), now).Scan(&playerID)
-			if err != nil {
-				return nil, fmt.Errorf("failed creating player profile: %w", err)
-			}
-		} else if err != nil {
-			return nil, fmt.Errorf("failed looking up player profile: %w", err)
-		}
+	err = tx.QueryRow(ctx, `
+		INSERT INTO players (display_name, primary_position, age, is_active, created_at, updated_at)
+		VALUES ($1, $2, $3, true, $4, $4)
+		RETURNING id
+	`, trimmedName, string(defaultPosition), age, now).Scan(&playerID)
+	if err != nil {
+		return nil, fmt.Errorf("failed creating player profile: %w", err)
 	}
 
 	phonePtr := &cleanPhone
@@ -147,6 +121,7 @@ func (r *AccountRepository) RegisterPlayer(
 
 func (r *AccountRepository) Authenticate(ctx context.Context, username, password string) (*PlayerAccountInfo, error) {
 	trimmedUser := strings.ToLower(strings.TrimSpace(username))
+	cleanPhone := normalizePhone(username)
 	if trimmedUser == "" || password == "" {
 		return nil, ErrInvalidCredentials
 	}
@@ -157,8 +132,9 @@ func (r *AccountRepository) Authenticate(ctx context.Context, username, password
 		SELECT pa.id, pa.player_id, pa.username, p.display_name, pa.role, pa.password_hash
 		FROM player_accounts pa
 		JOIN players p ON p.id = pa.player_id
-		WHERE pa.username = $1
-	`, trimmedUser).Scan(&info.ID, &info.PlayerID, &info.Username, &info.DisplayName, &info.Role, &storedHash)
+		WHERE pa.username = $1 OR ($2 != '' AND RIGHT(COALESCE(pa.phone, ''), 10) = RIGHT($2, 10))
+		LIMIT 1
+	`, trimmedUser, cleanPhone).Scan(&info.ID, &info.PlayerID, &info.Username, &info.DisplayName, &info.Role, &storedHash)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrInvalidCredentials
@@ -263,6 +239,89 @@ func (r *AccountRepository) ResetPinByPhone(ctx context.Context, username, phone
 		return fmt.Errorf("failed updating PIN: %w", err)
 	}
 	return nil
+}
+
+// VerifyAdminPassword checks a DB-stored ADMIN hash first, falling back to envFallback
+// only when no DB admin password has been set yet.
+func (r *AccountRepository) VerifyAdminPassword(ctx context.Context, username, password, envFallback string) (string, bool, error) {
+	trimmedUser := strings.ToLower(strings.TrimSpace(username))
+	if trimmedUser == "" || password == "" {
+		return "", false, nil
+	}
+
+	var playerID, storedHash string
+	err := r.pool.QueryRow(ctx, `
+		SELECT player_id, password_hash
+		FROM player_accounts
+		WHERE username = $1 AND role = 'ADMIN'
+		LIMIT 1
+	`, trimmedUser).Scan(&playerID, &storedHash)
+	if err == nil {
+		return playerID, verifyPassword(password, storedHash), nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return "", false, err
+	}
+
+	if envFallback == "" || subtle.ConstantTimeCompare([]byte(password), []byte(envFallback)) != 1 {
+		return "", false, nil
+	}
+	pid, err := r.EnsureAdminPlayer(ctx, username)
+	if err != nil {
+		return "", true, nil
+	}
+	return pid, true, nil
+}
+
+// ChangePassword updates the authenticated user's password/PIN in player_accounts.
+func (r *AccountRepository) ChangePassword(ctx context.Context, username, role, currentPassword, newPassword, envFallback string) error {
+	trimmedUser := strings.ToLower(strings.TrimSpace(username))
+	minLen := 4
+	if strings.EqualFold(role, "ADMIN") {
+		minLen = 6
+	}
+	if trimmedUser == "" || currentPassword == "" || len(newPassword) < minLen {
+		return fmt.Errorf("current password and new password (min %d characters) are required", minLen)
+	}
+
+	var accountID, storedHash string
+	err := r.pool.QueryRow(ctx, `
+		SELECT id, password_hash FROM player_accounts WHERE username = $1 LIMIT 1
+	`, trimmedUser).Scan(&accountID, &storedHash)
+
+	now := time.Now().UTC()
+	newHash, hashErr := hashPassword(newPassword)
+	if hashErr != nil {
+		return fmt.Errorf("failed securing new password: %w", hashErr)
+	}
+
+	if err == nil {
+		if !verifyPassword(currentPassword, storedHash) {
+			return ErrInvalidCredentials
+		}
+		_, updErr := r.pool.Exec(ctx, `
+			UPDATE player_accounts SET password_hash = $1, updated_at = $2 WHERE id = $3
+		`, newHash, now, accountID)
+		return updErr
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+
+	if !strings.EqualFold(role, "ADMIN") || envFallback == "" ||
+		subtle.ConstantTimeCompare([]byte(currentPassword), []byte(envFallback)) != 1 {
+		return ErrInvalidCredentials
+	}
+
+	pid, pidErr := r.EnsureAdminPlayer(ctx, username)
+	if pidErr != nil {
+		return fmt.Errorf("failed resolving admin profile: %w", pidErr)
+	}
+	_, insErr := r.pool.Exec(ctx, `
+		INSERT INTO player_accounts (player_id, username, password_hash, role, created_at, updated_at)
+		VALUES ($1, $2, $3, 'ADMIN', $4, $4)
+	`, pid, trimmedUser, newHash, now)
+	return insErr
 }
 
 func normalizePhone(raw string) string {

@@ -84,6 +84,11 @@ func (m *mockMatchStoreForService) RemoveAttendee(ctx context.Context, matchID s
 	return nil
 }
 
+func (m *mockMatchStoreForService) Delete(ctx context.Context, id string) error {
+	delete(m.matches, id)
+	return nil
+}
+
 func TestMatchService_SummaryCalculations(t *testing.T) {
 	store := &mockMatchStoreForService{
 		matches:   make(map[string]domain.Match),

@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.f4f.arena.ui.components.PollAdminOverflowMenu
 import com.f4f.arena.ui.components.PrimaryLimePillButton
 import com.f4f.arena.ui.components.VoterAvatarStack
 import com.f4f.arena.ui.state.MatchCardUi
@@ -33,7 +34,8 @@ fun AllMatchesScreen(
     onBack: () -> Unit,
     onOpenVoters: (String) -> Unit,
     onOpenTeams: (String) -> Unit,
-    onOpenCheckIn: (String) -> Unit
+    onOpenCheckIn: (String) -> Unit,
+    onDeleteMatch: (String) -> Unit = {}
 ) {
     Box(
         modifier = Modifier
@@ -101,11 +103,24 @@ fun AllMatchesScreen(
                     color = Color.White
                 ) {
                     Column(modifier = Modifier.padding(18.dp)) {
-                        Text(
-                            text = "${match.format.label} · ${match.timelineLabel}",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (match.isOngoing) F4FColors.PitchGreen else F4FColors.TextSecondary
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "${match.format.label} · ${match.timelineLabel}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (match.isOngoing) F4FColors.PitchGreen else F4FColors.TextSecondary
+                            )
+                            if (isAdmin) {
+                                PollAdminOverflowMenu(
+                                    matchTitle = match.title,
+                                    isEnded = match.isEnded,
+                                    onDeleteMatch = { onDeleteMatch(match.id) }
+                                )
+                            }
+                        }
                         Spacer(Modifier.height(4.dp))
                         Text(
                             text = match.title,

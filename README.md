@@ -145,7 +145,7 @@ cd backend
 go run cmd/api/main.go
 ```
 
-By default, the server listens on `http://localhost:8080` with development credentials (`admin` / `f4f_arena_secret_passphrase`). Override via environment variables or `deployments/.env.example`.
+By default, the server listens on `http://localhost:8080`. Set `ADMIN_PASSPHRASE` (and `JWT_SECRET` in production) via environment variables or `.env` (never commit real passwords to the repository), and once signed in as admin you can change the admin password directly in-app.
 
 Verify the server:
 

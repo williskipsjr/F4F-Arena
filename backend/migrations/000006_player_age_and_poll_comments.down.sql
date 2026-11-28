@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS match_comments;
+ALTER TABLE players DROP COLUMN IF EXISTS age;

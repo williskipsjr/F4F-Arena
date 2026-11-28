@@ -6,6 +6,10 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 // Load custom API Base URL from local.properties if present
 val localProperties = Properties()
 val localPropertiesFile = rootProject.file("local.properties")
@@ -109,6 +113,10 @@ dependencies {
     // Coroutines & WorkManager
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.work.runtime.ktx)
+
+    // Firebase Phone Auth (OTP)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth)
 
     // Testing
     testImplementation(libs.junit)
