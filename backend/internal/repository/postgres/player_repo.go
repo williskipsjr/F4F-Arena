@@ -27,7 +27,7 @@ func NewPlayerRepository(pool *pgxpool.Pool) *PlayerRepository {
 func (r *PlayerRepository) List(ctx context.Context, filter domain.PlayerFilter) ([]domain.Player, error) {
 	queryBuilder := strings.Builder{}
 	queryBuilder.WriteString(`
-		SELECT id, display_name, primary_position, age, avatar_emoji, is_active, notes, created_at, updated_at
+		SELECT id, display_name, primary_position, age, avatar_emoji, avatar_url, is_active, notes, created_at, updated_at
 		FROM players
 		WHERE 1=1
 	`)
@@ -71,6 +71,7 @@ func (r *PlayerRepository) List(ctx context.Context, filter domain.PlayerFilter)
 			&posStr,
 			&p.Age,
 			&p.AvatarEmoji,
+			&p.AvatarURL,
 			&p.IsActive,
 			&p.Notes,
 			&p.CreatedAt,
@@ -92,7 +93,7 @@ func (r *PlayerRepository) List(ctx context.Context, filter domain.PlayerFilter)
 
 func (r *PlayerRepository) GetByID(ctx context.Context, id string) (*domain.Player, error) {
 	query := `
-		SELECT id, display_name, primary_position, age, avatar_emoji, is_active, notes, created_at, updated_at
+		SELECT id, display_name, primary_position, age, avatar_emoji, avatar_url, is_active, notes, created_at, updated_at
 		FROM players
 		WHERE id = $1
 	`
@@ -104,6 +105,7 @@ func (r *PlayerRepository) GetByID(ctx context.Context, id string) (*domain.Play
 		&posStr,
 		&p.Age,
 		&p.AvatarEmoji,
+		&p.AvatarURL,
 		&p.IsActive,
 		&p.Notes,
 		&p.CreatedAt,
@@ -124,8 +126,8 @@ func (r *PlayerRepository) Create(ctx context.Context, p *domain.Player) error {
 		p.AvatarEmoji = "⚽"
 	}
 	query := `
-		INSERT INTO players (display_name, primary_position, age, avatar_emoji, is_active, notes, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO players (display_name, primary_position, age, avatar_emoji, avatar_url, pre_phone, is_active, notes, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING id, created_at, updated_at
 	`
 	now := time.Now().UTC()
@@ -136,6 +138,8 @@ func (r *PlayerRepository) Create(ctx context.Context, p *domain.Player) error {
 		string(p.PrimaryPosition),
 		p.Age,
 		p.AvatarEmoji,
+		p.AvatarURL,
+		p.PrePhone,
 		p.IsActive,
 		p.Notes,
 		now,
@@ -154,8 +158,8 @@ func (r *PlayerRepository) Update(ctx context.Context, p *domain.Player) error {
 	}
 	query := `
 		UPDATE players
-		SET display_name = $1, primary_position = $2, age = $3, avatar_emoji = $4, is_active = $5, notes = $6, updated_at = $7
-		WHERE id = $8
+		SET display_name = $1, primary_position = $2, age = $3, avatar_emoji = $4, avatar_url = COALESCE($5, avatar_url), pre_phone = COALESCE($6, pre_phone), is_active = $7, notes = $8, updated_at = $9
+		WHERE id = $10
 		RETURNING updated_at
 	`
 	now := time.Now().UTC()
@@ -166,6 +170,8 @@ func (r *PlayerRepository) Update(ctx context.Context, p *domain.Player) error {
 		string(p.PrimaryPosition),
 		p.Age,
 		p.AvatarEmoji,
+		p.AvatarURL,
+		p.PrePhone,
 		p.IsActive,
 		p.Notes,
 		now,
