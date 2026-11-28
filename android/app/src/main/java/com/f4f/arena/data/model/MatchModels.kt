@@ -72,6 +72,9 @@ data class Match(
     @SerializedName("in_count") val inCount: Int = 0,
     @SerializedName("out_count") val outCount: Int = 0,
     @SerializedName("my_vote") val myVote: String? = null,
+    @SerializedName("turf_fee") val turfFee: Int? = null,
+    @SerializedName("fee_per_player") val feePerPlayer: Int? = null,
+    @SerializedName("post_match_photo_url") val postMatchPhotoUrl: String? = null,
     @SerializedName("notes") val notes: String? = null,
     @SerializedName("created_at") val createdAt: String? = null,
     @SerializedName("updated_at") val updatedAt: String? = null
@@ -125,7 +128,9 @@ data class CreateMatchRequest(
 data class UpdateMatchRequest(
     @SerializedName("format") val format: String? = null,
     @SerializedName("status") val status: String? = null,
-    @SerializedName("is_poll_open") val isPollOpen: Boolean? = null
+    @SerializedName("is_poll_open") val isPollOpen: Boolean? = null,
+    @SerializedName("turf_fee") val turfFee: Int? = null,
+    @SerializedName("post_match_photo_url") val postMatchPhotoUrl: String? = null
 )
 
 data class CastVoteRequest(

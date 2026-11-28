@@ -1,6 +1,8 @@
 package com.f4f.arena.ui.screens
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -49,6 +51,7 @@ fun TeamBoardScreen(
     onOpenExport: () -> Unit
 ) {
     val activeCount = teams.sumOf { it.players.size }
+    var showPitchView by remember { mutableStateOf(true) }
 
     Scaffold(
         containerColor = F4FColors.CanvasOffWhite,
@@ -106,6 +109,35 @@ fun TeamBoardScreen(
                                 style = MaterialTheme.typography.labelMedium,
                                 color = F4FColors.ForestMid
                             )
+                        }
+
+                        Spacer(Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(F4FColors.SurfaceMuted)
+                                .padding(4.dp)
+                        ) {
+                            listOf(true to "Pitch Lineup", false to "Squad List").forEach { (isPitch, label) ->
+                                val selected = showPitchView == isPitch
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (selected) F4FColors.ForestDeep else Color.Transparent)
+                                        .clickable { showPitchView = isPitch }
+                                        .padding(vertical = 7.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = label,
+                                        color = if (selected) F4FColors.PitchLime else F4FColors.TextSecondary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
                         }
 
                         if (isAdmin && !isFinalised) {
@@ -246,6 +278,15 @@ fun TeamBoardScreen(
                         Spacer(Modifier.height(10.dp))
                         HorizontalDivider(color = F4FColors.HairlineBorder)
 
+                        if (showPitchView) {
+                            Spacer(Modifier.height(12.dp))
+                            FootballPitchLineupCard(
+                                team = team,
+                                isAdmin = isAdmin && !isFinalised,
+                                swapSourcePlayerId = swapSourcePlayerId,
+                                onTapPlayer = onTapPlayerForSwap
+                            )
+                        } else {
                         team.players.forEach { slot ->
                             val isSelectedForSwap = swapSourcePlayerId == slot.playerId
                             var menuOpen by remember { mutableStateOf(false) }
@@ -302,6 +343,7 @@ fun TeamBoardScreen(
                                     }
                                 }
                             }
+                        }
                         }
                     }
                 }
@@ -439,4 +481,123 @@ fun WhatsAppExportDialog(
             TextButton(onClick = onCopy) { Text("Copy") }
         }
     )
+}
+
+@Composable
+private fun FootballPitchLineupCard(
+    team: GeneratedTeamUi,
+    isAdmin: Boolean,
+    swapSourcePlayerId: String?,
+    onTapPlayer: (String) -> Unit
+) {
+    val strikers = team.players.filter { it.position == PlayerPosition.STR }
+    val midfielders = team.players.filter { it.position == PlayerPosition.MID }
+    val defenders = team.players.filter { it.position == PlayerPosition.DEF }
+    val keepers = team.players.filter { it.position == PlayerPosition.GK }
+
+    val rows = listOf(strikers, midfielders, defenders, keepers).filter { it.isNotEmpty() }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 290.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color(0xFF165B33))
+    ) {
+        Canvas(modifier = Modifier.matchParentSize()) {
+            val lineColor = Color.White.copy(alpha = 0.25f)
+            val stroke = 2.dp.toPx()
+            // Pitch border
+            drawRect(
+                color = lineColor,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke)
+            )
+            // Halfway line & center circle
+            drawLine(
+                color = lineColor,
+                start = androidx.compose.ui.geometry.Offset(0f, size.height * 0.5f),
+                end = androidx.compose.ui.geometry.Offset(size.width, size.height * 0.5f),
+                strokeWidth = stroke
+            )
+            drawCircle(
+                color = lineColor,
+                radius = size.minDimension * 0.14f,
+                center = androidx.compose.ui.geometry.Offset(size.width * 0.5f, size.height * 0.5f),
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke)
+            )
+            // Penalty box at bottom (GK end)
+            val boxW = size.width * 0.48f
+            val boxH = size.height * 0.16f
+            drawRect(
+                color = lineColor,
+                topLeft = androidx.compose.ui.geometry.Offset((size.width - boxW) / 2f, size.height - boxH),
+                size = androidx.compose.ui.geometry.Size(boxW, boxH),
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke)
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 18.dp, horizontal = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            rows.forEach { rowPlayers ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    rowPlayers.forEach { slot ->
+                        val selected = swapSourcePlayerId == slot.playerId
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable(enabled = isAdmin) { onTapPlayer(slot.playerId) }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (selected) F4FColors.PitchLime else Color(team.kitColorHex)
+                                    )
+                                    .border(
+                                        width = if (selected) 2.5.dp else 1.5.dp,
+                                        color = Color.White,
+                                        shape = CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = slot.position.shortCode,
+                                    color = if (selected) F4FColors.ForestDeep else Color.White,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 10.sp
+                                )
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color.Black.copy(alpha = 0.55f))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = slot.name.substringBefore(" "),
+                                    color = Color.White,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

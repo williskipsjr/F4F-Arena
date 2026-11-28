@@ -177,13 +177,20 @@ class MatchViewModel(
 
     fun endMatch(
         matchId: String,
+        turfFee: Int? = null,
+        postMatchPhotoUrl: String? = null,
         token: String = SessionManager.getBearerToken()
     ) {
         viewModelScope.launch {
             repository.updateMatch(
                 token,
                 matchId,
-                UpdateMatchRequest(status = "COMPLETED", isPollOpen = false)
+                UpdateMatchRequest(
+                    status = "COMPLETED",
+                    isPollOpen = false,
+                    turfFee = turfFee,
+                    postMatchPhotoUrl = postMatchPhotoUrl
+                )
             ).onSuccess { updatedMatch ->
                 val current = _uiState.value as? MatchUiState.Success ?: return@onSuccess
                 val updatedList = current.matches.map { if (it.id == updatedMatch.id) updatedMatch else it }

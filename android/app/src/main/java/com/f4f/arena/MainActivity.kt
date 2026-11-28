@@ -72,6 +72,7 @@ private fun F4FArenaApp(
     var searchQuery by remember { mutableStateOf("") }
     var activeAttendanceMatchId by remember { mutableStateOf<String?>(null) }
     var activeTeamBoardMatchId by remember { mutableStateOf<String?>(null) }
+    var forceRegenerateTeamBoard by remember { mutableStateOf(false) }
 
     var showAuthSheet by remember { mutableStateOf(false) }
     var authInitialSignUp by remember { mutableStateOf(false) }
@@ -92,6 +93,7 @@ private fun F4FArenaApp(
     var votersList by remember { mutableStateOf<List<PollVoteUi>>(emptyList()) }
     var commentsList by remember { mutableStateOf<List<PollCommentUi>>(emptyList()) }
     var postingComment by remember { mutableStateOf(false) }
+    var postMatchDialogCard by remember { mutableStateOf<MatchCardUi?>(null) }
 
     var showAddPlayerDialog by remember { mutableStateOf(false) }
     var editingPlayer by remember { mutableStateOf<Player?>(null) }
@@ -230,7 +232,9 @@ private fun F4FArenaApp(
 
     LaunchedEffect(activeTeamBoardMatchId) {
         if (activeTeamBoardMatchId != null) {
-            teamBoardViewModel.loadOrGenerateTeams(activeTeamBoardMatchId!!)
+            val force = forceRegenerateTeamBoard
+            forceRegenerateTeamBoard = false
+            teamBoardViewModel.loadOrGenerateTeams(activeTeamBoardMatchId!!, forceRegenerate = force)
         }
     }
 
@@ -447,6 +451,7 @@ private fun F4FArenaApp(
                         onSaveAttendance = { attendanceViewModel.saveAttendance() },
                         onGenerateTeams = {
                             attendanceViewModel.saveAttendance {
+                                forceRegenerateTeamBoard = true
                                 activeTeamBoardMatchId = activeAttendanceMatchId
                             }
                         }
@@ -490,7 +495,9 @@ private fun F4FArenaApp(
                                 },
                                 onOpenTeams = { matchId -> activeTeamBoardMatchId = matchId },
                                 onOpenCheckIn = { matchId -> activeAttendanceMatchId = matchId },
-                                onEndMatch = { matchId -> matchViewModel.endMatch(matchId) },
+                                onEndMatch = { matchId ->
+                                    postMatchDialogCard = allMatchCards.firstOrNull { it.id == matchId }
+                                },
                                 onDeleteMatch = { matchId -> matchViewModel.deleteMatch(matchId) },
                                 onSeeAllMatches = { selectedTab = F4FBottomTab.MATCHES },
                                 onCreateNewPoll = { showCreatePollModal = true }
@@ -747,6 +754,23 @@ private fun F4FArenaApp(
         )
     }
 
+    if (postMatchDialogCard != null) {
+        val target = postMatchDialogCard!!
+        PostMatchUpdateDialog(
+            matchTitle = target.title,
+            playerCount = target.inCount,
+            onDismiss = { postMatchDialogCard = null },
+            onConfirm = { turfFee, photoDataUrl ->
+                matchViewModel.endMatch(
+                    matchId = target.id,
+                    turfFee = turfFee,
+                    postMatchPhotoUrl = photoDataUrl
+                )
+                postMatchDialogCard = null
+            }
+        )
+    }
+
     if (showAddPlayerDialog) {
         AddPlayerDialog(
             onDismiss = { showAddPlayerDialog = false },
@@ -828,6 +852,7 @@ private fun Player.toUi(): PlayerUi = PlayerUi(
     name = displayName,
     position = primaryPosition.toUi(),
     age = age,
+    avatarEmoji = avatarEmoji.ifBlank { "⚽" },
     isActive = isActive,
     notes = notes ?: ""
 )
@@ -869,7 +894,10 @@ private fun com.f4f.arena.data.model.Match.toCardUi(): MatchCardUi {
             else -> null
         },
         teamsReady = status == MatchStatus.TEAMS_GENERATED || status == MatchStatus.FINALISED,
-        finalised = status == MatchStatus.FINALISED
+        finalised = status == MatchStatus.FINALISED,
+        turfFee = turfFee,
+        feePerPlayer = feePerPlayer,
+        postMatchPhotoUrl = postMatchPhotoUrl
     )
 }
 

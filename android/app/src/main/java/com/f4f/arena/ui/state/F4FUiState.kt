@@ -41,6 +41,7 @@ data class PlayerUi(
     val name: String,
     val position: PlayerPosition,
     val age: Int? = null,
+    val avatarEmoji: String = "⚽",
     val isActive: Boolean = true,
     val notes: String = ""
 )
@@ -77,7 +78,10 @@ data class MatchCardUi(
     val currentUserVoteIn: Boolean?,
     val teamsReady: Boolean,
     val finalised: Boolean,
-    val voterInitials: List<String> = emptyList()
+    val voterInitials: List<String> = emptyList(),
+    val turfFee: Int? = null,
+    val feePerPlayer: Int? = null,
+    val postMatchPhotoUrl: String? = null
 )
 
 data class FeedbackItemUi(

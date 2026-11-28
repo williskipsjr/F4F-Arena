@@ -1,5 +1,6 @@
 package com.f4f.arena.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,13 +15,17 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.f4f.arena.ui.components.PollAdminOverflowMenu
 import com.f4f.arena.ui.components.PrimaryLimePillButton
 import com.f4f.arena.ui.components.VoterAvatarStack
@@ -148,6 +153,38 @@ fun AllMatchesScreen(
                             }
                         }
                         Spacer(Modifier.height(14.dp))
+                        val postPhoto = remember(match.postMatchPhotoUrl) {
+                            decodeDataUrlToBitmap(match.postMatchPhotoUrl)
+                        }
+                        if (postPhoto != null) {
+                            Image(
+                                bitmap = postPhoto.asImageBitmap(),
+                                contentDescription = "Post-match squad photo",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(170.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                            )
+                            Spacer(Modifier.height(10.dp))
+                        }
+                        if (match.feePerPlayer != null && match.turfFee != null) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xFFDCFCE7))
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Text(
+                                    text = "Turf Fee: ₹${match.feePerPlayer} / player (Total ₹${match.turfFee})",
+                                    color = F4FColors.ForestDeep,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
+                            Spacer(Modifier.height(10.dp))
+                        }
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             PrimaryLimePillButton(
                                 text = "View Teams",
