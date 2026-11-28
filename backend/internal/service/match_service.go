@@ -109,6 +109,21 @@ func (s *MatchService) UpdateMatch(ctx context.Context, id string, input domain.
 	if input.IsPollOpen != nil {
 		match.IsPollOpen = *input.IsPollOpen
 	}
+	if input.PostMatchPhotoURL != nil {
+		match.PostMatchPhotoURL = input.PostMatchPhotoURL
+	}
+	if input.TurfFee != nil && *input.TurfFee >= 0 {
+		match.TurfFee = input.TurfFee
+		attendees, _ := s.store.GetAttendees(ctx, id)
+		playerCount := len(attendees)
+		if playerCount == 0 {
+			playerCount = match.InCount
+		}
+		if playerCount > 0 {
+			perPlayer := (*input.TurfFee + playerCount - 1) / playerCount
+			match.FeePerPlayer = &perPlayer
+		}
+	}
 	if input.Notes != nil {
 		match.Notes = input.Notes
 	}

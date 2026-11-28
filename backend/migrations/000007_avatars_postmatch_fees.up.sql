@@ -1,0 +1,8 @@
+ALTER TABLE players
+    ADD COLUMN IF NOT EXISTS avatar_emoji TEXT NOT NULL DEFAULT '⚽',
+    ADD COLUMN IF NOT EXISTS pre_phone TEXT;
+
+ALTER TABLE matches
+    ADD COLUMN IF NOT EXISTS turf_fee INT,
+    ADD COLUMN IF NOT EXISTS fee_per_player INT,
+    ADD COLUMN IF NOT EXISTS post_match_photo_url TEXT;

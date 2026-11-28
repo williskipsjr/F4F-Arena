@@ -37,6 +37,12 @@ type ChangePasswordRequest struct {
 	NewPassword     string `json:"new_password"`
 }
 
+type ClaimProfileRequest struct {
+	PlayerID string `json:"player_id"`
+	Phone    string `json:"phone"`
+	Password string `json:"password"`
+}
+
 type LoginResponse struct {
 	Token       string    `json:"token"`
 	TokenType   string    `json:"token_type"`
@@ -232,5 +238,35 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{
 		"status":  "ok",
 		"message": "Password updated successfully",
+	})
+}
+
+func (h *AuthHandler) ClaimProfile(w http.ResponseWriter, r *http.Request) {
+	if h.accountRepo == nil {
+		writeError(w, http.StatusServiceUnavailable, "DB_UNAVAILABLE", "Database unavailable")
+		return
+	}
+	var req ClaimProfileRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "Invalid JSON request body")
+		return
+	}
+	info, err := h.accountRepo.ClaimProfile(r.Context(), req.PlayerID, req.Phone, req.Password)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "CLAIM_FAILED", err.Error())
+		return
+	}
+	token, expiresAt, err := h.tokenService.GenerateTokenWithRole(info.Username, info.Role, info.PlayerID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to generate token")
+		return
+	}
+	writeJSON(w, http.StatusCreated, LoginResponse{
+		Token:       token,
+		TokenType:   "Bearer",
+		ExpiresAt:   expiresAt.UTC(),
+		Role:        info.Role,
+		PlayerID:    info.PlayerID,
+		DisplayName: info.DisplayName,
 	})
 }
