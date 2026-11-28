@@ -10,10 +10,13 @@ import com.f4f.arena.data.model.PhoneLookupResponse
 import com.f4f.arena.data.model.RegisterRequest
 import com.f4f.arena.data.model.ResetPinRequest
 import com.f4f.arena.data.model.ResetPinResponse
+import com.f4f.arena.data.model.UpdateProfileRequest
+import com.f4f.arena.data.model.UpdateProfileResponse
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 
 interface AuthApi {
@@ -37,6 +40,12 @@ interface AuthApi {
         @Header("Authorization") bearerToken: String,
         @Body request: ChangePasswordRequest
     ): Response<ResetPinResponse>
+
+    @PATCH("api/v1/auth/profile")
+    suspend fun updateProfile(
+        @Header("Authorization") bearerToken: String,
+        @Body request: UpdateProfileRequest
+    ): Response<UpdateProfileResponse>
 
     @GET("api/v1/auth/verify")
     suspend fun verifyAuth(@Header("Authorization") bearerToken: String): Response<AuthVerifyResponse>

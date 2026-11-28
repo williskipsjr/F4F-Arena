@@ -586,6 +586,18 @@ private fun F4FArenaApp(
                                         snackbarHostState.showSnackbar(msg)
                                     }
                                 }
+                            },
+                            onUpdateProfile = { newName, newAvatarUrl, onDone ->
+                                scope.launch {
+                                    val res = SessionManager.updateOwnProfile(newName, newAvatarUrl)
+                                    onDone(res)
+                                    res.onSuccess {
+                                        rosterViewModel.loadRoster()
+                                        snackbarHostState.showSnackbar("Profile updated!")
+                                    }.onFailure { err ->
+                                        snackbarHostState.showSnackbar(err.localizedMessage ?: "Profile update failed")
+                                    }
+                                }
                             }
                         )
                     }
@@ -823,8 +835,8 @@ private fun F4FArenaApp(
     if (showAddPlayerDialog) {
         AddPlayerDialog(
             onDismiss = { showAddPlayerDialog = false },
-            onConfirm = { name, pos, notes ->
-                rosterViewModel.createPlayer(name, pos, notes)
+            onConfirmWithPhone = { name, pos, notes, phone ->
+                rosterViewModel.createPlayer(name, pos, notes, phone)
                 showAddPlayerDialog = false
             }
         )
@@ -839,8 +851,8 @@ private fun F4FArenaApp(
             dialogTitle = "Assign Position / Edit Player",
             confirmLabel = "Save",
             onDismiss = { editingPlayer = null },
-            onConfirm = { name, pos, notes ->
-                rosterViewModel.updatePlayerDetails(target.id, name, pos, notes)
+            onConfirmWithPhone = { name, pos, notes, phone ->
+                rosterViewModel.updatePlayerDetails(target.id, name, pos, notes, phone)
                 editingPlayer = null
             }
         )
@@ -902,6 +914,7 @@ private fun Player.toUi(): PlayerUi = PlayerUi(
     position = primaryPosition.toUi(),
     age = age,
     avatarEmoji = avatarEmoji.ifBlank { "⚽" },
+    avatarUrl = avatarUrl,
     isActive = isActive,
     notes = notes ?: ""
 )
@@ -918,6 +931,7 @@ private fun MatchVoteDetail.toUi(): PollVoteUi = PollVoteUi(
     playerId = playerId,
     playerName = displayName,
     position = primaryPosition.toUi(),
+    avatarUrl = avatarUrl,
     isIn = vote == "IN",
     votedAtLabel = formatIsoTimestamp(votedAt)
 )

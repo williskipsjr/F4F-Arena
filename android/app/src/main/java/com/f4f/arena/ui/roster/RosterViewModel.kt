@@ -115,13 +115,20 @@ class RosterViewModel(
         }
     }
 
-    fun createPlayer(name: String, position: Position, notes: String?, token: String = com.f4f.arena.data.auth.SessionManager.getBearerToken()) {
+    fun createPlayer(
+        name: String,
+        position: Position,
+        notes: String?,
+        phone: String? = null,
+        token: String = com.f4f.arena.data.auth.SessionManager.getBearerToken()
+    ) {
         viewModelScope.launch {
             repository.createPlayer(
                 token,
                 CreatePlayerRequest(
                     displayName = name,
                     primaryPosition = position.name,
+                    prePhone = phone?.trim()?.ifBlank { null },
                     isActive = true,
                     notes = notes
                 )
@@ -138,6 +145,7 @@ class RosterViewModel(
         name: String,
         position: Position,
         notes: String?,
+        phone: String? = null,
         token: String = com.f4f.arena.data.auth.SessionManager.getBearerToken()
     ) {
         viewModelScope.launch {
@@ -147,6 +155,7 @@ class RosterViewModel(
                 UpdatePlayerRequest(
                     displayName = name,
                     primaryPosition = position.name,
+                    prePhone = phone?.trim()?.ifBlank { null },
                     notes = notes
                 )
             ).onSuccess { updated ->

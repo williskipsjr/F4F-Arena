@@ -44,6 +44,16 @@ data class ChangePasswordRequest(
     @SerializedName("new_password") val newPassword: String
 )
 
+data class UpdateProfileRequest(
+    @SerializedName("display_name") val displayName: String? = null,
+    @SerializedName("avatar_url") val avatarUrl: String? = null
+)
+
+data class UpdateProfileResponse(
+    @SerializedName("display_name") val displayName: String,
+    @SerializedName("avatar_url") val avatarUrl: String? = null
+)
+
 data class ResetPinResponse(
     @SerializedName("status") val status: String,
     @SerializedName("message") val message: String

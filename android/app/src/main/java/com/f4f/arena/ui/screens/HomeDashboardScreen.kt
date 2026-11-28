@@ -220,9 +220,13 @@ private fun FeaturedPollCard(
         modifier = modifier
             .fillMaxWidth()
             .shadow(12.dp, RoundedCornerShape(24.dp), ambientColor = F4FColors.ForestDeep.copy(alpha = 0.14f))
+            .then(
+                if (poll.isEnded) Modifier.border(1.5.dp, Color(0xFFFCA5A5), RoundedCornerShape(24.dp))
+                else Modifier
+            )
             .clickable(onClick = onOpenVoters),
         shape = RoundedCornerShape(24.dp),
-        color = F4FColors.CardWhite
+        color = if (poll.isEnded) Color(0xFFFEF2F2) else F4FColors.CardWhite
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
             Row(
@@ -230,11 +234,24 @@ private fun FeaturedPollCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = if (poll.pollOpen) "Poll open · ${poll.dateLabel}" else "Poll closed · ${poll.dateLabel}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = F4FColors.ForestMid
-                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (poll.isEnded) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFFDC2626))
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text("MATCH ENDED", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                    } else {
+                        Text(
+                            text = if (poll.pollOpen) "Poll open · ${poll.dateLabel}" else "Poll closed · ${poll.dateLabel}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = F4FColors.ForestMid
+                        )
+                    }
+                }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         text = "Votes & Comments",
@@ -283,9 +300,27 @@ private fun FeaturedPollCard(
             Text(
                 text = "${poll.timelineLabel} · ${poll.venue} · ${poll.format.label}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (poll.isOngoing) F4FColors.PitchGreen else F4FColors.TextSecondary,
-                fontWeight = if (poll.isOngoing) FontWeight.SemiBold else FontWeight.Normal
+                color = if (poll.isEnded) Color(0xFFB91C1C) else if (poll.isOngoing) F4FColors.PitchGreen else F4FColors.TextSecondary,
+                fontWeight = if (poll.isOngoing || poll.isEnded) FontWeight.SemiBold else FontWeight.Normal
             )
+
+            if (poll.isEnded && poll.feePerPlayer != null && poll.turfFee != null) {
+                Spacer(Modifier.height(10.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFFFEE2E2))
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = "Payment Due: ₹${poll.feePerPlayer} / player (Total Turf Fee ₹${poll.turfFee})",
+                        color = Color(0xFF991B1B),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                }
+            }
 
             Spacer(Modifier.height(16.dp))
 
@@ -406,9 +441,13 @@ private fun ExploreMatchCard(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .shadow(6.dp, RoundedCornerShape(22.dp), ambientColor = F4FColors.ForestDeep.copy(alpha = 0.08f)),
+            .shadow(6.dp, RoundedCornerShape(22.dp), ambientColor = F4FColors.ForestDeep.copy(alpha = 0.08f))
+            .then(
+                if (match.isEnded) Modifier.border(1.dp, Color(0xFFFCA5A5), RoundedCornerShape(22.dp))
+                else Modifier
+            ),
         shape = RoundedCornerShape(22.dp),
-        color = F4FColors.CardWhite
+        color = if (match.isEnded) Color(0xFFFEF2F2) else F4FColors.CardWhite
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
