@@ -2,8 +2,11 @@ package com.f4f.arena.data.api
 
 import com.f4f.arena.data.model.AuthVerifyResponse
 import com.f4f.arena.data.model.ChangePasswordRequest
+import com.f4f.arena.data.model.ClaimProfileRequest
 import com.f4f.arena.data.model.LoginRequest
 import com.f4f.arena.data.model.LoginResponse
+import com.f4f.arena.data.model.PhoneLookupRequest
+import com.f4f.arena.data.model.PhoneLookupResponse
 import com.f4f.arena.data.model.RegisterRequest
 import com.f4f.arena.data.model.ResetPinRequest
 import com.f4f.arena.data.model.ResetPinResponse
@@ -19,6 +22,12 @@ interface AuthApi {
 
     @POST("api/v1/auth/register")
     suspend fun register(@Body request: RegisterRequest): Response<LoginResponse>
+
+    @POST("api/v1/auth/phone-lookup")
+    suspend fun phoneLookup(@Body request: PhoneLookupRequest): Response<PhoneLookupResponse>
+
+    @POST("api/v1/auth/claim-profile")
+    suspend fun claimProfile(@Body request: ClaimProfileRequest): Response<LoginResponse>
 
     @POST("api/v1/auth/reset-pin")
     suspend fun resetPin(@Body request: ResetPinRequest): Response<ResetPinResponse>

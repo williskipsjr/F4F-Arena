@@ -16,6 +16,23 @@ data class RegisterRequest(
     @SerializedName("firebase_id_token") val firebaseIdToken: String? = null
 )
 
+data class PhoneLookupRequest(
+    @SerializedName("phone") val phone: String
+)
+
+data class PhoneLookupResponse(
+    @SerializedName("found") val found: Boolean,
+    @SerializedName("player_id") val playerId: String? = null,
+    @SerializedName("display_name") val displayName: String? = null,
+    @SerializedName("claimed") val claimed: Boolean = false
+)
+
+data class ClaimProfileRequest(
+    @SerializedName("player_id") val playerId: String,
+    @SerializedName("phone") val phone: String,
+    @SerializedName("password") val password: String
+)
+
 data class ResetPinRequest(
     @SerializedName("username") val username: String,
     @SerializedName("phone") val phone: String,
