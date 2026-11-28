@@ -141,6 +141,7 @@ data class MatchVoteDetail(
     @SerializedName("player_id") val playerId: String,
     @SerializedName("display_name") val displayName: String,
     @SerializedName("primary_position") val primaryPosition: Position,
+    @SerializedName("avatar_url") val avatarUrl: String? = null,
     @SerializedName("vote") val vote: String,
     @SerializedName("voted_at") val votedAt: String
 )

@@ -191,6 +191,7 @@ type MatchVoteDetail struct {
 	PlayerID        string    `json:"player_id"`
 	DisplayName     string    `json:"display_name"`
 	PrimaryPosition Position  `json:"primary_position"`
+	AvatarURL       *string   `json:"avatar_url,omitempty"`
 	Vote            string    `json:"vote"`
 	VotedAt         time.Time `json:"voted_at"`
 }

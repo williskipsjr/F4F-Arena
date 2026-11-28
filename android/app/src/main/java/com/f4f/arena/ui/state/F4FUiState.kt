@@ -33,7 +33,8 @@ data class UserSessionUi(
     val name: String,
     val username: String,
     val role: UserRole,
-    val playerId: String?
+    val playerId: String?,
+    val avatarUrl: String? = null
 )
 
 data class PlayerUi(
@@ -42,6 +43,7 @@ data class PlayerUi(
     val position: PlayerPosition,
     val age: Int? = null,
     val avatarEmoji: String = "⚽",
+    val avatarUrl: String? = null,
     val isActive: Boolean = true,
     val notes: String = ""
 )
@@ -50,6 +52,7 @@ data class PollVoteUi(
     val playerId: String,
     val playerName: String,
     val position: PlayerPosition,
+    val avatarUrl: String? = null,
     val isIn: Boolean,
     val votedAtLabel: String
 )

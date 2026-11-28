@@ -30,6 +30,8 @@ type Player struct {
 	PrimaryPosition Position  `json:"primary_position"`
 	Age             *int      `json:"age,omitempty"`
 	AvatarEmoji     string    `json:"avatar_emoji"`
+	AvatarURL       *string   `json:"avatar_url,omitempty"`
+	PrePhone        *string   `json:"-"`
 	IsActive        bool      `json:"is_active"`
 	Notes           *string   `json:"notes,omitempty"`
 	CreatedAt       time.Time `json:"created_at"`
@@ -61,6 +63,7 @@ type PlayerFilter struct {
 type CreatePlayerInput struct {
 	DisplayName     string   `json:"display_name"`
 	PrimaryPosition Position `json:"primary_position"`
+	PrePhone        *string  `json:"pre_phone,omitempty"`
 	IsActive        *bool    `json:"is_active,omitempty"`
 	Notes           *string  `json:"notes,omitempty"`
 }
@@ -70,6 +73,8 @@ type UpdatePlayerInput struct {
 	PrimaryPosition *Position `json:"primary_position,omitempty"`
 	Age             *int      `json:"age,omitempty"`
 	AvatarEmoji     *string   `json:"avatar_emoji,omitempty"`
+	AvatarURL       *string   `json:"avatar_url,omitempty"`
+	PrePhone        *string   `json:"pre_phone,omitempty"`
 	IsActive        *bool     `json:"is_active,omitempty"`
 	Notes           *string   `json:"notes,omitempty"`
 }

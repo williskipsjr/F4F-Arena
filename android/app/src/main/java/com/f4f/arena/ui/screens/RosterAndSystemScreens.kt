@@ -19,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -163,7 +164,8 @@ fun UpdatesAndFeedbackScreen(
     onRecheck: () -> Unit,
     onOpenAuth: () -> Unit,
     onSignOut: () -> Unit,
-    onChangePassword: (currentPassword: String, newPassword: String, onResult: (Result<String>) -> Unit) -> Unit = { _, _, _ -> }
+    onChangePassword: (currentPassword: String, newPassword: String, onResult: (Result<String>) -> Unit) -> Unit = { _, _, _ -> },
+    onUpdateProfile: (newName: String?, newAvatarUrl: String?, onResult: (Result<Unit>) -> Unit) -> Unit = { _, _, _ -> }
 ) {
     val isAdmin = session?.role == UserRole.ADMIN
     var selectedCategory by remember { mutableStateOf("FEATURE") }
@@ -252,12 +254,94 @@ fun UpdatesAndFeedbackScreen(
             }
         }
 
-        // Current Session Card (Everyone)
+        // Current Session & My Profile Card (Everyone)
         Surface(shape = RoundedCornerShape(22.dp), color = Color.White, modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Current Session", style = MaterialTheme.typography.titleMedium)
+            Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(if (session != null) "My Profile & Session" else "Current Session", style = MaterialTheme.typography.titleMedium)
                 if (session != null) {
-                    Text("${session.name} (@${session.username}) · ${session.role.name}")
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    var editName by remember(session.name) { mutableStateOf(session.name) }
+                    var selectedAvatarUrl by remember { mutableStateOf<String?>(null) }
+                    var savingProfile by remember { mutableStateOf(false) }
+
+                    val pfpLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                        androidx.activity.result.contract.ActivityResultContracts.GetContent()
+                    ) { uri ->
+                        if (uri != null) {
+                            runCatching {
+                                context.contentResolver.openInputStream(uri)?.use { stream ->
+                                    val bmp = android.graphics.BitmapFactory.decodeStream(stream)
+                                    if (bmp != null) {
+                                        val ratio = 256f / maxOf(bmp.width, bmp.height).coerceAtLeast(1)
+                                        val w = (bmp.width * ratio).toInt().coerceAtLeast(1)
+                                        val h = (bmp.height * ratio).toInt().coerceAtLeast(1)
+                                        val scaled = android.graphics.Bitmap.createScaledBitmap(bmp, w, h, true)
+                                        val out = java.io.ByteArrayOutputStream()
+                                        scaled.compress(android.graphics.Bitmap.CompressFormat.JPEG, 70, out)
+                                        val b64 = android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP)
+                                        selectedAvatarUrl = "data:image/jpeg;base64,$b64"
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    val previewBmp = remember(selectedAvatarUrl) { decodeDataUrlToBitmap(selectedAvatarUrl) }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        if (previewBmp != null) {
+                            androidx.compose.foundation.Image(
+                                bitmap = previewBmp.asImageBitmap(),
+                                contentDescription = "Profile photo",
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(CircleShape)
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(CircleShape)
+                                    .background(F4FColors.ForestDeep),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    session.name.take(2).uppercase(),
+                                    color = F4FColors.PitchLime,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        OutlinedButton(
+                            onClick = { pfpLauncher.launch("image/*") },
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Text("Choose Photo (PFP)", fontSize = 12.sp)
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = editName,
+                        onValueChange = { editName = it },
+                        label = { Text("Display Name") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    PrimaryLimePillButton(
+                        text = if (savingProfile) "Saving..." else "Save Profile",
+                        enabled = !savingProfile && (editName.isNotBlank() || selectedAvatarUrl != null),
+                        onClick = {
+                            savingProfile = true
+                            onUpdateProfile(editName.trim(), selectedAvatarUrl) {
+                                savingProfile = false
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Text("@${session.username} · ${session.role.name}", style = MaterialTheme.typography.labelMedium, color = F4FColors.TextSecondary)
                     OutlinedButton(
                         onClick = { showChangePasswordDialog = true },
                         shape = RoundedCornerShape(20.dp),

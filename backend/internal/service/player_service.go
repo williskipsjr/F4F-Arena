@@ -44,6 +44,7 @@ func (s *PlayerService) CreatePlayer(ctx context.Context, input domain.CreatePla
 	player := &domain.Player{
 		DisplayName:     strings.TrimSpace(input.DisplayName),
 		PrimaryPosition: input.PrimaryPosition,
+		PrePhone:        input.PrePhone,
 		IsActive:        isActive,
 		Notes:           input.Notes,
 	}
@@ -83,6 +84,13 @@ func (s *PlayerService) UpdatePlayer(ctx context.Context, id string, input domai
 	}
 	if input.AvatarEmoji != nil && strings.TrimSpace(*input.AvatarEmoji) != "" {
 		existing.AvatarEmoji = strings.TrimSpace(*input.AvatarEmoji)
+	}
+	if input.AvatarURL != nil {
+		existing.AvatarURL = input.AvatarURL
+	}
+	if input.PrePhone != nil && strings.TrimSpace(*input.PrePhone) != "" {
+		ph := strings.TrimSpace(*input.PrePhone)
+		existing.PrePhone = &ph
 	}
 	if input.IsActive != nil {
 		existing.IsActive = *input.IsActive

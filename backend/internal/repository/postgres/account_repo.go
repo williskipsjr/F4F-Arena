@@ -425,6 +425,32 @@ func (r *AccountRepository) LookupByPhone(ctx context.Context, phone string) (*P
 	}, nil
 }
 
+// UpdateOwnProfile updates the authenticated user's display_name and/or avatar_url.
+func (r *AccountRepository) UpdateOwnProfile(ctx context.Context, playerID string, displayName, avatarURL *string) (string, *string, error) {
+	if strings.TrimSpace(playerID) == "" {
+		return "", nil, errors.New("no player profile linked to this account")
+	}
+	var currentName string
+	var currentAvatar *string
+	err := r.pool.QueryRow(ctx, `SELECT display_name, avatar_url FROM players WHERE id = $1`, playerID).Scan(&currentName, &currentAvatar)
+	if err != nil {
+		return "", nil, err
+	}
+	if displayName != nil && strings.TrimSpace(*displayName) != "" {
+		currentName = strings.TrimSpace(*displayName)
+	}
+	if avatarURL != nil {
+		currentAvatar = avatarURL
+	}
+	_, err = r.pool.Exec(ctx, `
+		UPDATE players SET display_name = $1, avatar_url = $2, updated_at = NOW() WHERE id = $3
+	`, currentName, currentAvatar, playerID)
+	if err != nil {
+		return "", nil, err
+	}
+	return currentName, currentAvatar, nil
+}
+
 func normalizePhone(raw string) string {
 	var b strings.Builder
 	for _, ch := range raw {

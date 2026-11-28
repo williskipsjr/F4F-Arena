@@ -410,7 +410,7 @@ func (r *MatchRepository) GetPlayerVotesMap(ctx context.Context, playerID string
 // GetMatchVotes returns all IN/OUT votes for a match with player details and vote timestamps.
 func (r *MatchRepository) GetMatchVotes(ctx context.Context, matchID string) ([]domain.MatchVoteDetail, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT v.player_id, p.display_name, p.primary_position, v.vote, v.voted_at
+		SELECT v.player_id, p.display_name, p.primary_position, p.avatar_url, v.vote, v.voted_at
 		FROM match_votes v
 		JOIN players p ON p.id = v.player_id
 		WHERE v.match_id = $1
@@ -425,7 +425,7 @@ func (r *MatchRepository) GetMatchVotes(ctx context.Context, matchID string) ([]
 	for rows.Next() {
 		var item domain.MatchVoteDetail
 		var posStr string
-		if err := rows.Scan(&item.PlayerID, &item.DisplayName, &posStr, &item.Vote, &item.VotedAt); err != nil {
+		if err := rows.Scan(&item.PlayerID, &item.DisplayName, &posStr, &item.AvatarURL, &item.Vote, &item.VotedAt); err != nil {
 			return nil, fmt.Errorf("failed scanning match vote: %w", err)
 		}
 		item.PrimaryPosition = domain.Position(posStr)

@@ -218,6 +218,31 @@ object SessionManager {
         }
     }
 
+    suspend fun updateOwnProfile(
+        displayName: String? = null,
+        avatarUrl: String? = null
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val response = NetworkClient.authApi.updateProfile(
+                bearerToken = getBearerToken(),
+                request = com.f4f.arena.data.model.UpdateProfileRequest(
+                    displayName = displayName?.trim()?.ifBlank { null },
+                    avatarUrl = avatarUrl
+                )
+            )
+            if (response.isSuccessful && response.body() != null) {
+                val body = response.body()!!
+                _displayName.value = body.displayName
+                prefs?.edit()?.putString(KEY_DISPLAY_NAME, body.displayName)?.apply()
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception("Profile update failed (HTTP ${response.code()})"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     fun requestLoginPrompt() {
         _authPromptRequired.value = true
     }

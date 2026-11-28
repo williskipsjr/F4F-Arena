@@ -47,6 +47,11 @@ type PhoneLookupRequest struct {
 	Phone string `json:"phone"`
 }
 
+type UpdateProfileRequest struct {
+	DisplayName *string `json:"display_name,omitempty"`
+	AvatarURL   *string `json:"avatar_url,omitempty"`
+}
+
 type LoginResponse struct {
 	Token       string    `json:"token"`
 	TokenType   string    `json:"token_type"`
@@ -291,4 +296,30 @@ func (h *AuthHandler) PhoneLookup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, res)
+}
+
+func (h *AuthHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	if h.accountRepo == nil {
+		writeError(w, http.StatusServiceUnavailable, "DB_UNAVAILABLE", "Database unavailable")
+		return
+	}
+	claims, _ := r.Context().Value(auth.AdminContextKey).(*auth.Claims)
+	if claims == nil || claims.PlayerID == "" {
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Player authentication required")
+		return
+	}
+	var req UpdateProfileRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "Invalid JSON request body")
+		return
+	}
+	name, avatar, err := h.accountRepo.UpdateOwnProfile(r.Context(), claims.PlayerID, req.DisplayName, req.AvatarURL)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "UPDATE_FAILED", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"display_name": name,
+		"avatar_url":   avatar,
+	})
 }

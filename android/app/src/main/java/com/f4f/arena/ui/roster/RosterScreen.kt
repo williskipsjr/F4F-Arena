@@ -314,10 +314,12 @@ fun AddPlayerDialog(
     dialogTitle: String = "Add Player to Roster",
     confirmLabel: String = "Add Player",
     onDismiss: () -> Unit,
-    onConfirm: (String, Position, String?) -> Unit
+    onConfirmWithPhone: ((String, Position, String?, String?) -> Unit)? = null,
+    onConfirm: (String, Position, String?) -> Unit = { _, _, _ -> }
 ) {
     var name by remember { mutableStateOf(initialName) }
     var selectedPosition by remember { mutableStateOf(initialPosition) }
+    var phone by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf(initialNotes) }
     var nameError by remember { mutableStateOf(false) }
 
@@ -355,6 +357,14 @@ fun AddPlayerDialog(
                 }
 
                 OutlinedTextField(
+                    value = phone,
+                    onValueChange = { phone = it },
+                    label = { Text("Phone Number (optional · for onboarding)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
                     value = notes,
                     onValueChange = { notes = it },
                     label = { Text("Notes (optional)") },
@@ -368,7 +378,13 @@ fun AddPlayerDialog(
                     if (name.isBlank()) {
                         nameError = true
                     } else {
-                        onConfirm(name.trim(), selectedPosition, notes.ifBlank { null })
+                        val cleanNotes = notes.ifBlank { null }
+                        val cleanPhone = phone.trim().ifBlank { null }
+                        if (onConfirmWithPhone != null) {
+                            onConfirmWithPhone(name.trim(), selectedPosition, cleanNotes, cleanPhone)
+                        } else {
+                            onConfirm(name.trim(), selectedPosition, cleanNotes)
+                        }
                     }
                 }
             ) {
