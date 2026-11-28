@@ -202,6 +202,7 @@ type MatchComment struct {
 	PlayerID   *string   `json:"player_id,omitempty"`
 	AuthorName string    `json:"author_name"`
 	AuthorRole string    `json:"author_role"`
+	AvatarURL  *string   `json:"avatar_url,omitempty"`
 	Message    string    `json:"message"`
 	CreatedAt  time.Time `json:"created_at"`
 }

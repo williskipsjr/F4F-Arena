@@ -434,12 +434,15 @@ func (r *MatchRepository) GetMatchVotes(ctx context.Context, matchID string) ([]
 	return votes, nil
 }
 
+// ErrCommentForbidden is returned when a non-admin tries to delete another user's comment.
+var ErrCommentForbidden = errors.New("you can only delete your own comments")
+
 // ListComments returns all comments/notes on a match ordered chronologically.
 func (r *MatchRepository) ListComments(ctx context.Context, matchID string) ([]domain.MatchComment, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT mc.id, mc.match_id, mc.player_id,
 		       COALESCE(NULLIF(p.display_name, ''), mc.author_name),
-		       mc.author_role, mc.message, mc.created_at
+		       mc.author_role, p.avatar_url, mc.message, mc.created_at
 		FROM match_comments mc
 		LEFT JOIN players p ON p.id = mc.player_id
 		WHERE mc.match_id = $1
@@ -453,7 +456,7 @@ func (r *MatchRepository) ListComments(ctx context.Context, matchID string) ([]d
 	comments := make([]domain.MatchComment, 0)
 	for rows.Next() {
 		var c domain.MatchComment
-		if err := rows.Scan(&c.ID, &c.MatchID, &c.PlayerID, &c.AuthorName, &c.AuthorRole, &c.Message, &c.CreatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.MatchID, &c.PlayerID, &c.AuthorName, &c.AuthorRole, &c.AvatarURL, &c.Message, &c.CreatedAt); err != nil {
 			return nil, fmt.Errorf("failed scanning match comment: %w", err)
 		}
 		comments = append(comments, c)
@@ -470,10 +473,15 @@ func (r *MatchRepository) CreateComment(ctx context.Context, matchID string, pla
 	if authorRole == "" {
 		authorRole = "PLAYER"
 	}
-	if playerID != nil && *playerID != "" && !strings.EqualFold(authorRole, "ADMIN") {
+	var avatarURL *string
+	if playerID != nil && *playerID != "" {
 		var pName string
-		if err := r.pool.QueryRow(ctx, `SELECT display_name FROM players WHERE id = $1`, *playerID).Scan(&pName); err == nil && strings.TrimSpace(pName) != "" {
-			authorName = strings.TrimSpace(pName)
+		var pAvatar *string
+		if err := r.pool.QueryRow(ctx, `SELECT display_name, avatar_url FROM players WHERE id = $1`, *playerID).Scan(&pName, &pAvatar); err == nil {
+			if !strings.EqualFold(authorRole, "ADMIN") && strings.TrimSpace(pName) != "" {
+				authorName = strings.TrimSpace(pName)
+			}
+			avatarURL = pAvatar
 		}
 	}
 	var c domain.MatchComment
@@ -487,11 +495,25 @@ func (r *MatchRepository) CreateComment(ctx context.Context, matchID string, pla
 	if err != nil {
 		return nil, fmt.Errorf("failed posting comment: %w", err)
 	}
+	c.AvatarURL = avatarURL
 	return &c, nil
 }
 
-// DeleteComment removes a comment by ID (admin moderation).
-func (r *MatchRepository) DeleteComment(ctx context.Context, matchID, commentID string) error {
+// DeleteComment removes a comment by ID (admins can delete any; players can delete their own).
+func (r *MatchRepository) DeleteComment(ctx context.Context, matchID, commentID, requesterPlayerID string, isAdmin bool) error {
+	if !isAdmin {
+		var ownerID *string
+		err := r.pool.QueryRow(ctx, `SELECT player_id FROM match_comments WHERE id = $1 AND match_id = $2`, commentID, matchID).Scan(&ownerID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrMatchNotFound
+		}
+		if err != nil {
+			return fmt.Errorf("failed checking comment ownership: %w", err)
+		}
+		if requesterPlayerID == "" || ownerID == nil || *ownerID != requesterPlayerID {
+			return ErrCommentForbidden
+		}
+	}
 	tag, err := r.pool.Exec(ctx, `DELETE FROM match_comments WHERE id = $1 AND match_id = $2`, commentID, matchID)
 	if err != nil {
 		return fmt.Errorf("failed deleting comment: %w", err)
