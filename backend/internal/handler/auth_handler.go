@@ -43,6 +43,10 @@ type ClaimProfileRequest struct {
 	Password string `json:"password"`
 }
 
+type PhoneLookupRequest struct {
+	Phone string `json:"phone"`
+}
+
 type LoginResponse struct {
 	Token       string    `json:"token"`
 	TokenType   string    `json:"token_type"`
@@ -269,4 +273,22 @@ func (h *AuthHandler) ClaimProfile(w http.ResponseWriter, r *http.Request) {
 		PlayerID:    info.PlayerID,
 		DisplayName: info.DisplayName,
 	})
+}
+
+func (h *AuthHandler) PhoneLookup(w http.ResponseWriter, r *http.Request) {
+	if h.accountRepo == nil {
+		writeError(w, http.StatusServiceUnavailable, "DB_UNAVAILABLE", "Database unavailable")
+		return
+	}
+	var req PhoneLookupRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "Invalid JSON request body")
+		return
+	}
+	res, err := h.accountRepo.LookupByPhone(r.Context(), req.Phone)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "LOOKUP_FAILED", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
 }

@@ -108,6 +108,7 @@ func main() {
 	})
 	r.Post("/api/v1/auth/login", authHandler.Login)
 	r.Post("/api/v1/auth/register", authHandler.Register)
+	r.Post("/api/v1/auth/phone-lookup", authHandler.PhoneLookup)
 	r.Post("/api/v1/auth/claim-profile", authHandler.ClaimProfile)
 	r.Post("/api/v1/auth/reset-pin", authHandler.ResetPin)
 	if playerHandler != nil {
