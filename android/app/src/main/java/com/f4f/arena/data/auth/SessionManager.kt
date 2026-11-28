@@ -97,6 +97,47 @@ object SessionManager {
         }
     }
 
+    suspend fun phoneLookup(phone: String): Result<com.f4f.arena.data.model.PhoneLookupResponse> = withContext(Dispatchers.IO) {
+        try {
+            val res = NetworkClient.authApi.phoneLookup(
+                com.f4f.arena.data.model.PhoneLookupRequest(phone.trim())
+            )
+            if (res.isSuccessful && res.body() != null) {
+                Result.success(res.body()!!)
+            } else {
+                Result.failure(Exception("Lookup failed (HTTP ${res.code()})"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun claimProfile(
+        playerId: String,
+        phone: String,
+        pin: String
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val phoneDigits = phone.filter { it.isDigit() }
+            val derivedUser = if (phoneDigits.length >= 10) phoneDigits.takeLast(10) else phone.trim()
+            val response = NetworkClient.authApi.claimProfile(
+                com.f4f.arena.data.model.ClaimProfileRequest(
+                    playerId = playerId,
+                    phone = phone.trim(),
+                    password = pin
+                )
+            )
+            if (response.isSuccessful && response.body() != null) {
+                saveSession(derivedUser, response.body()!!)
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception("Claim failed (HTTP ${response.code()})"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun register(
         displayName: String,
         phone: String,

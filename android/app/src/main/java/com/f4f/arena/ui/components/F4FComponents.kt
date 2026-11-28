@@ -44,9 +44,15 @@ enum class F4FBottomTab(val label: String, val icon: ImageVector) {
 @Composable
 fun FloatingDarkBottomBar(
     selectedTab: F4FBottomTab,
+    isAdmin: Boolean = false,
     onSelectTab: (F4FBottomTab) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val visibleTabs = if (isAdmin) {
+        F4FBottomTab.entries
+    } else {
+        F4FBottomTab.entries.filter { it != F4FBottomTab.ROSTER }
+    }
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -62,7 +68,7 @@ fun FloatingDarkBottomBar(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            F4FBottomTab.entries.forEach { tab ->
+            visibleTabs.forEach { tab ->
                 val isSelected = tab == selectedTab
                 val containerBg by animateColorAsState(
                     if (isSelected) Color.White else Color.Transparent,

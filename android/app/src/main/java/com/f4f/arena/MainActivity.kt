@@ -590,7 +590,8 @@ private fun F4FArenaApp(
                 }
 
                 FloatingDarkBottomBar(
-                    selectedTab = selectedTab,
+                    selectedTab = if (!isAdmin && selectedTab == F4FBottomTab.ROSTER) F4FBottomTab.HOME else selectedTab,
+                    isAdmin = isAdmin,
                     onSelectTab = { selectedTab = it },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -624,6 +625,21 @@ private fun F4FArenaApp(
                         matchViewModel.loadMatches()
                     } else {
                         authError = res.exceptionOrNull()?.message ?: "Sign in failed"
+                    }
+                }
+            },
+            onClaimProfile = { playerId, phone, pin ->
+                scope.launch {
+                    authLoading = true
+                    authError = null
+                    val res = SessionManager.claimProfile(playerId, phone, pin)
+                    authLoading = false
+                    if (res.isSuccess) {
+                        showAuthSheet = false
+                        matchViewModel.loadMatches()
+                        rosterViewModel.loadRoster()
+                    } else {
+                        authError = res.exceptionOrNull()?.message ?: "Claim failed"
                     }
                 }
             },

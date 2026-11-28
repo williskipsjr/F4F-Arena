@@ -385,6 +385,46 @@ func (r *AccountRepository) ClaimProfile(ctx context.Context, playerID, phone, p
 	}, nil
 }
 
+type PhoneLookupResult struct {
+	Found       bool   `json:"found"`
+	PlayerID    string `json:"player_id,omitempty"`
+	DisplayName string `json:"display_name,omitempty"`
+	Claimed     bool   `json:"claimed"`
+}
+
+// LookupByPhone finds a community player by the last 10 digits of their phone number.
+func (r *AccountRepository) LookupByPhone(ctx context.Context, phone string) (*PhoneLookupResult, error) {
+	clean := normalizePhone(phone)
+	if len(clean) < 10 {
+		return &PhoneLookupResult{Found: false}, nil
+	}
+	last10 := clean[len(clean)-10:]
+
+	var playerID, displayName string
+	var accountID *string
+	err := r.pool.QueryRow(ctx, `
+		SELECT p.id, p.display_name, pa.id
+		FROM players p
+		LEFT JOIN player_accounts pa ON pa.player_id = p.id
+		WHERE RIGHT(REGEXP_REPLACE(COALESCE(p.pre_phone, ''), '[^0-9]', '', 'g'), 10) = $1
+		   OR RIGHT(REGEXP_REPLACE(COALESCE(pa.phone, ''), '[^0-9]', '', 'g'), 10) = $1
+		LIMIT 1
+	`, last10).Scan(&playerID, &displayName, &accountID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return &PhoneLookupResult{Found: false}, nil
+		}
+		return nil, err
+	}
+
+	return &PhoneLookupResult{
+		Found:       true,
+		PlayerID:    playerID,
+		DisplayName: displayName,
+		Claimed:     accountID != nil,
+	}, nil
+}
+
 func normalizePhone(raw string) string {
 	var b strings.Builder
 	for _, ch := range raw {
