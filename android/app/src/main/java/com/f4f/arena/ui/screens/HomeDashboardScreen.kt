@@ -34,7 +34,7 @@ fun HomeDashboardScreen(
     session: UserSessionUi?,
     searchQuery: String,
     featuredPoll: MatchCardUi?,
-    exploreMatches: List<MatchCardUi>,
+    recentEndedMatch: MatchCardUi?,
     onSearchChange: (String) -> Unit,
     onAvatarClick: () -> Unit,
     onVote: (matchId: String, voteIn: Boolean) -> Unit,
@@ -149,40 +149,88 @@ fun HomeDashboardScreen(
                         modifier = Modifier.padding(horizontal = 20.dp)
                     )
                 }
-            }
 
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Explore Matches",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = F4FColors.TextPrimary
-                    )
-                    Text(
-                        text = "See all",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = F4FColors.ForestMid,
-                        modifier = Modifier.clickable(onClick = onSeeAllMatches)
-                    )
+                if (!featuredPoll.isEnded) {
+                    item {
+                        MatchdayQuickStatusRow(
+                            poll = featuredPoll,
+                            onOpenTeams = { onOpenTeams(featuredPoll.id) },
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                        )
+                    }
                 }
             }
 
-            items(exploreMatches, key = { it.id }) { match ->
-                ExploreMatchCard(
-                    match = match,
-                    isAdmin = isAdmin,
-                    onViewTeams = { onOpenTeams(match.id) },
-                    onCheckIn = { onOpenCheckIn(match.id) },
-                    onEndMatch = { onEndMatch(match.id) },
-                    onDeleteMatch = { onDeleteMatch(match.id) },
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
-                )
+            if (recentEndedMatch != null) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Last Match Recap",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = F4FColors.TextPrimary
+                        )
+                        Text(
+                            text = "Past Matches →",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = F4FColors.ForestMid,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.clickable(onClick = onSeeAllMatches)
+                        )
+                    }
+                }
+
+                item {
+                    ExploreMatchCard(
+                        match = recentEndedMatch,
+                        isAdmin = isAdmin,
+                        onViewTeams = { onOpenTeams(recentEndedMatch.id) },
+                        onCheckIn = { onOpenCheckIn(recentEndedMatch.id) },
+                        onEndMatch = { onEndMatch(recentEndedMatch.id) },
+                        onDeleteMatch = { onDeleteMatch(recentEndedMatch.id) },
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+                    )
+                }
+            } else {
+                item {
+                    Surface(
+                        shape = RoundedCornerShape(18.dp),
+                        color = F4FColors.CardWhite,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 14.dp)
+                            .clickable(onClick = onSeeAllMatches)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "Past Matches & Squad Photos",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = F4FColors.TextPrimary
+                                )
+                                Text(
+                                    text = "View completed matches, lineups & turf fees",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = F4FColors.TextSecondary
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.Outlined.ArrowForward,
+                                contentDescription = "Open Matches",
+                                tint = F4FColors.ForestDeep
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -557,6 +605,74 @@ private fun ExploreMatchCard(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MatchdayQuickStatusRow(
+    poll: MatchCardUi,
+    onOpenTeams: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = F4FColors.CardWhite,
+            modifier = Modifier.weight(1f)
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+                Text(
+                    text = "YOUR RSVP",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = F4FColors.TextMuted
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = when (poll.currentUserVoteIn) {
+                        true -> "You're IN"
+                        false -> "Voted OUT"
+                        null -> "Not voted yet"
+                    },
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = when (poll.currentUserVoteIn) {
+                        true -> F4FColors.ForestDeep
+                        false -> Color(0xFFB91C1C)
+                        null -> F4FColors.TextSecondary
+                    }
+                )
+            }
+        }
+
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = if (poll.finalised || poll.teamsReady) Color(0xFFDCFCE7) else F4FColors.CardWhite,
+            modifier = Modifier
+                .weight(1f)
+                .clickable(onClick = onOpenTeams)
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+                Text(
+                    text = "SQUAD STATUS",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = F4FColors.TextMuted
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = when {
+                        poll.finalised -> "Lineups Ready →"
+                        poll.teamsReady -> "Draft Teams →"
+                        else -> "${poll.inCount} IN · Open"
+                    },
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = F4FColors.ForestDeep
+                )
             }
         }
     }
