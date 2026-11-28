@@ -437,10 +437,13 @@ func (r *MatchRepository) GetMatchVotes(ctx context.Context, matchID string) ([]
 // ListComments returns all comments/notes on a match ordered chronologically.
 func (r *MatchRepository) ListComments(ctx context.Context, matchID string) ([]domain.MatchComment, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, match_id, player_id, author_name, author_role, message, created_at
-		FROM match_comments
-		WHERE match_id = $1
-		ORDER BY created_at ASC
+		SELECT mc.id, mc.match_id, mc.player_id,
+		       COALESCE(NULLIF(p.display_name, ''), mc.author_name),
+		       mc.author_role, mc.message, mc.created_at
+		FROM match_comments mc
+		LEFT JOIN players p ON p.id = mc.player_id
+		WHERE mc.match_id = $1
+		ORDER BY mc.created_at ASC
 	`, matchID)
 	if err != nil {
 		return nil, fmt.Errorf("failed fetching match comments: %w", err)
@@ -466,6 +469,12 @@ func (r *MatchRepository) CreateComment(ctx context.Context, matchID string, pla
 	}
 	if authorRole == "" {
 		authorRole = "PLAYER"
+	}
+	if playerID != nil && *playerID != "" && !strings.EqualFold(authorRole, "ADMIN") {
+		var pName string
+		if err := r.pool.QueryRow(ctx, `SELECT display_name FROM players WHERE id = $1`, *playerID).Scan(&pName); err == nil && strings.TrimSpace(pName) != "" {
+			authorName = strings.TrimSpace(pName)
+		}
 	}
 	var c domain.MatchComment
 	err := r.pool.QueryRow(ctx, `

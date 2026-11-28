@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.f4f.arena.data.api.NetworkClient
@@ -42,6 +43,7 @@ import com.f4f.arena.ui.roster.RosterViewModel
 import com.f4f.arena.ui.screens.*
 import com.f4f.arena.ui.state.*
 import com.f4f.arena.ui.theme.F4FMaterialTheme
+import com.f4f.arena.util.InAppUpdater
 import com.f4f.arena.util.WhatsAppFormatter
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -678,27 +680,58 @@ private fun F4FArenaApp(
 
     if (availableUpdate != null) {
         val upd = availableUpdate!!
+        var downloading by remember { mutableStateOf(false) }
+        var downloadProgress by remember { mutableStateOf(0f) }
+        var downloadError by remember { mutableStateOf<String?>(null) }
+
         AlertDialog(
-            onDismissRequest = { availableUpdate = null },
+            onDismissRequest = { if (!downloading) availableUpdate = null },
             title = { Text("Update Available (v${upd.versionName})") },
             text = {
-                Text(
-                    if (upd.releaseNotes.isNotBlank()) upd.releaseNotes
-                    else "A newer version of F4F Arena is ready with the latest UI & fixes."
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        if (upd.releaseNotes.isNotBlank()) upd.releaseNotes
+                        else "A newer version of F4F Arena is ready with the latest UI & fixes."
+                    )
+                    if (downloading) {
+                        LinearProgressIndicator(
+                            progress = { downloadProgress },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text("Downloading update... ${(downloadProgress * 100).toInt()}%")
+                    }
+                    if (downloadError != null) {
+                        Text(downloadError!!, color = MaterialTheme.colorScheme.error)
+                    }
+                }
             },
             confirmButton = {
-                Button(onClick = {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(upd.downloadUrl))
-                    context.startActivity(intent)
-                    availableUpdate = null
-                }) {
-                    Text("Download Update")
+                Button(
+                    enabled = !downloading,
+                    onClick = {
+                        downloading = true
+                        downloadError = null
+                        scope.launch {
+                            val res = InAppUpdater.downloadAndInstall(context, upd.downloadUrl) { p ->
+                                downloadProgress = p
+                            }
+                            downloading = false
+                            res.onSuccess {
+                                availableUpdate = null
+                            }.onFailure { err ->
+                                downloadError = err.localizedMessage ?: "Download failed"
+                            }
+                        }
+                    }
+                ) {
+                    Text(if (downloading) "Downloading..." else "Update Now")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { availableUpdate = null }) {
-                    Text("Later")
+                if (!downloading) {
+                    TextButton(onClick = { availableUpdate = null }) {
+                        Text("Later")
+                    }
                 }
             }
         )
