@@ -324,6 +324,67 @@ func (r *AccountRepository) ChangePassword(ctx context.Context, username, role, 
 	return insErr
 }
 
+// ClaimProfile verifies that a pre-seeded player's phone matches and creates their 4-digit PIN login.
+func (r *AccountRepository) ClaimProfile(ctx context.Context, playerID, phone, pin string) (*PlayerAccountInfo, error) {
+	cleanPhone := normalizePhone(phone)
+	if strings.TrimSpace(playerID) == "" || len(cleanPhone) < 10 || len(pin) < 4 {
+		return nil, errors.New("player_id, valid phone number (10+ digits), and 4-digit PIN are required")
+	}
+
+	var displayName string
+	var prePhone *string
+	err := r.pool.QueryRow(ctx, `
+		SELECT display_name, pre_phone FROM players WHERE id = $1
+	`, strings.TrimSpace(playerID)).Scan(&displayName, &prePhone)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, errors.New("player profile not found")
+		}
+		return nil, err
+	}
+
+	if prePhone == nil || normalizePhone(*prePhone) == "" {
+		return nil, errors.New("this profile has no pre-registered phone number; use Sign Up instead")
+	}
+	preDigits := normalizePhone(*prePhone)
+	if len(preDigits) < 10 || preDigits[len(preDigits)-10:] != cleanPhone[len(cleanPhone)-10:] {
+		return nil, errors.New("phone number does not match our community roster")
+	}
+
+	var existingAcc string
+	err = r.pool.QueryRow(ctx, `SELECT id FROM player_accounts WHERE player_id = $1`, playerID).Scan(&existingAcc)
+	if err == nil {
+		return nil, errors.New("this profile is already claimed — please Sign In")
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+
+	username := cleanPhone[len(cleanPhone)-10:]
+	hash, err := hashPassword(pin)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now().UTC()
+	var accountID string
+	err = r.pool.QueryRow(ctx, `
+		INSERT INTO player_accounts (player_id, username, phone, password_hash, role, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, 'PLAYER', $5, $5)
+		RETURNING id
+	`, playerID, username, &cleanPhone, hash, now).Scan(&accountID)
+	if err != nil {
+		return nil, fmt.Errorf("failed claiming profile: %w", err)
+	}
+
+	return &PlayerAccountInfo{
+		ID:          accountID,
+		PlayerID:    playerID,
+		Username:    username,
+		DisplayName: displayName,
+		Role:        "PLAYER",
+	}, nil
+}
+
 func normalizePhone(raw string) string {
 	var b strings.Builder
 	for _, ch := range raw {

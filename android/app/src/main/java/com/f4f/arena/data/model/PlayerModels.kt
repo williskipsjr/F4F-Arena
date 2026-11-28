@@ -27,6 +27,7 @@ data class Player(
     @SerializedName("display_name") val displayName: String,
     @SerializedName("primary_position") val primaryPosition: Position,
     @SerializedName("age") val age: Int? = null,
+    @SerializedName("avatar_emoji") val avatarEmoji: String = "⚽",
     @SerializedName("is_active") val isActive: Boolean,
     @SerializedName("notes") val notes: String? = null,
     @SerializedName("created_at") val createdAt: String? = null,
@@ -53,6 +54,7 @@ data class CreatePlayerResponse(
 data class UpdatePlayerRequest(
     @SerializedName("display_name") val displayName: String? = null,
     @SerializedName("primary_position") val primaryPosition: String? = null,
+    @SerializedName("avatar_emoji") val avatarEmoji: String? = null,
     @SerializedName("is_active") val isActive: Boolean? = null,
     @SerializedName("notes") val notes: String? = null
 )

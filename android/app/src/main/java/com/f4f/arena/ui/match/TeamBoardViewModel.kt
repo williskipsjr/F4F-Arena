@@ -34,17 +34,25 @@ class TeamBoardViewModel(
 
     private var currentMatchId: String? = null
 
-    fun loadOrGenerateTeams(matchId: String, token: String = com.f4f.arena.data.auth.SessionManager.getBearerToken()) {
+    fun loadOrGenerateTeams(
+        matchId: String,
+        forceRegenerate: Boolean = false,
+        token: String = com.f4f.arena.data.auth.SessionManager.getBearerToken()
+    ) {
         currentMatchId = matchId
         viewModelScope.launch {
             _uiState.value = TeamBoardUiState.Loading
+            if (forceRegenerate) {
+                generateTeams(matchId, subPolicy = null, autoFormat = false, token = token)
+                return@launch
+            }
             val getResult = repository.getTeams(matchId)
             if (getResult.isSuccess) {
                 val existing = getResult.getOrNull()
                 if (existing != null && existing.teams.orEmpty().isNotEmpty()) {
                     _uiState.value = TeamBoardUiState.Success(data = existing)
                 } else {
-                    generateTeams(matchId, subPolicy = null, autoFormat = true, token = token)
+                    generateTeams(matchId, subPolicy = null, autoFormat = false, token = token)
                 }
             } else {
                 _uiState.value = TeamBoardUiState.Error(

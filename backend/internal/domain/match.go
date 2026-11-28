@@ -89,21 +89,24 @@ func (p SubstitutePolicy) IsValid() bool {
 }
 
 type Match struct {
-	ID          string           `json:"id"`
-	Title       string           `json:"title"`
-	MatchDate   *time.Time       `json:"match_date,omitempty"`
-	KickoffTime *string          `json:"kickoff_time,omitempty"`
-	Venue       *string          `json:"venue,omitempty"`
-	Format      MatchFormat      `json:"format"`
-	Status      MatchStatus      `json:"status"`
-	SubPolicy   SubstitutePolicy `json:"sub_policy"`
-	IsPollOpen  bool             `json:"is_poll_open"`
-	InCount     int              `json:"in_count"`
-	OutCount    int              `json:"out_count"`
-	MyVote      *string          `json:"my_vote,omitempty"`
-	Notes       *string          `json:"notes,omitempty"`
-	CreatedAt   time.Time        `json:"created_at"`
-	UpdatedAt   time.Time        `json:"updated_at"`
+	ID                string           `json:"id"`
+	Title             string           `json:"title"`
+	MatchDate         *time.Time       `json:"match_date,omitempty"`
+	KickoffTime       *string          `json:"kickoff_time,omitempty"`
+	Venue             *string          `json:"venue,omitempty"`
+	Format            MatchFormat      `json:"format"`
+	Status            MatchStatus      `json:"status"`
+	SubPolicy         SubstitutePolicy `json:"sub_policy"`
+	IsPollOpen        bool             `json:"is_poll_open"`
+	InCount           int              `json:"in_count"`
+	OutCount          int              `json:"out_count"`
+	MyVote            *string          `json:"my_vote,omitempty"`
+	TurfFee           *int             `json:"turf_fee,omitempty"`
+	FeePerPlayer      *int             `json:"fee_per_player,omitempty"`
+	PostMatchPhotoURL *string          `json:"post_match_photo_url,omitempty"`
+	Notes             *string          `json:"notes,omitempty"`
+	CreatedAt         time.Time        `json:"created_at"`
+	UpdatedAt         time.Time        `json:"updated_at"`
 }
 
 func (m *Match) Validate() error {
@@ -166,15 +169,17 @@ type CreateMatchInput struct {
 }
 
 type UpdateMatchInput struct {
-	Title       *string           `json:"title,omitempty"`
-	MatchDate   *time.Time        `json:"match_date,omitempty"`
-	KickoffTime *string           `json:"kickoff_time,omitempty"`
-	Venue       *string           `json:"venue,omitempty"`
-	Format      *MatchFormat      `json:"format,omitempty"`
-	Status      *MatchStatus      `json:"status,omitempty"`
-	SubPolicy   *SubstitutePolicy `json:"sub_policy,omitempty"`
-	IsPollOpen  *bool             `json:"is_poll_open,omitempty"`
-	Notes       *string           `json:"notes,omitempty"`
+	Title             *string           `json:"title,omitempty"`
+	MatchDate         *time.Time        `json:"match_date,omitempty"`
+	KickoffTime       *string           `json:"kickoff_time,omitempty"`
+	Venue             *string           `json:"venue,omitempty"`
+	Format            *MatchFormat      `json:"format,omitempty"`
+	Status            *MatchStatus      `json:"status,omitempty"`
+	SubPolicy         *SubstitutePolicy `json:"sub_policy,omitempty"`
+	IsPollOpen        *bool             `json:"is_poll_open,omitempty"`
+	TurfFee           *int              `json:"turf_fee,omitempty"`
+	PostMatchPhotoURL *string           `json:"post_match_photo_url,omitempty"`
+	Notes             *string           `json:"notes,omitempty"`
 }
 
 type CastVoteInput struct {

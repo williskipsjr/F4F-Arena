@@ -81,6 +81,9 @@ func (s *PlayerService) UpdatePlayer(ctx context.Context, id string, input domai
 	if input.Age != nil {
 		existing.Age = input.Age
 	}
+	if input.AvatarEmoji != nil && strings.TrimSpace(*input.AvatarEmoji) != "" {
+		existing.AvatarEmoji = strings.TrimSpace(*input.AvatarEmoji)
+	}
 	if input.IsActive != nil {
 		existing.IsActive = *input.IsActive
 	}

@@ -58,7 +58,7 @@ func (r *MatchRepository) GetByID(ctx context.Context, id string) (*domain.Match
 		SELECT m.id, m.title, m.match_date, m.kickoff_time, m.venue, m.format, m.status, m.sub_policy, m.is_poll_open,
 		       COALESCE((SELECT COUNT(*) FROM match_votes v WHERE v.match_id = m.id AND v.vote = 'IN'), 0),
 		       COALESCE((SELECT COUNT(*) FROM match_votes v WHERE v.match_id = m.id AND v.vote = 'OUT'), 0),
-		       m.notes, m.created_at, m.updated_at
+		       m.turf_fee, m.fee_per_player, m.post_match_photo_url, m.notes, m.created_at, m.updated_at
 		FROM matches m
 		WHERE m.id = $1
 	`
@@ -76,6 +76,9 @@ func (r *MatchRepository) GetByID(ctx context.Context, id string) (*domain.Match
 		&m.IsPollOpen,
 		&m.InCount,
 		&m.OutCount,
+		&m.TurfFee,
+		&m.FeePerPlayer,
+		&m.PostMatchPhotoURL,
 		&m.Notes,
 		&m.CreatedAt,
 		&m.UpdatedAt,
@@ -98,7 +101,7 @@ func (r *MatchRepository) List(ctx context.Context, status *domain.MatchStatus) 
 		SELECT m.id, m.title, m.match_date, m.kickoff_time, m.venue, m.format, m.status, m.sub_policy, m.is_poll_open,
 		       COALESCE((SELECT COUNT(*) FROM match_votes v WHERE v.match_id = m.id AND v.vote = 'IN'), 0),
 		       COALESCE((SELECT COUNT(*) FROM match_votes v WHERE v.match_id = m.id AND v.vote = 'OUT'), 0),
-		       m.notes, m.created_at, m.updated_at
+		       m.turf_fee, m.fee_per_player, m.post_match_photo_url, m.notes, m.created_at, m.updated_at
 		FROM matches m
 	`)
 	var args []interface{}
@@ -130,6 +133,9 @@ func (r *MatchRepository) List(ctx context.Context, status *domain.MatchStatus) 
 			&m.IsPollOpen,
 			&m.InCount,
 			&m.OutCount,
+			&m.TurfFee,
+			&m.FeePerPlayer,
+			&m.PostMatchPhotoURL,
 			&m.Notes,
 			&m.CreatedAt,
 			&m.UpdatedAt,
@@ -149,8 +155,8 @@ func (r *MatchRepository) List(ctx context.Context, status *domain.MatchStatus) 
 func (r *MatchRepository) Update(ctx context.Context, m *domain.Match) error {
 	query := `
 		UPDATE matches
-		SET title = $1, match_date = $2, kickoff_time = $3, venue = $4, format = $5, status = $6, sub_policy = $7, is_poll_open = $8, notes = $9, updated_at = $10
-		WHERE id = $11
+		SET title = $1, match_date = $2, kickoff_time = $3, venue = $4, format = $5, status = $6, sub_policy = $7, is_poll_open = $8, turf_fee = $9, fee_per_player = $10, post_match_photo_url = $11, notes = $12, updated_at = $13
+		WHERE id = $14
 		RETURNING updated_at
 	`
 	now := time.Now().UTC()
@@ -165,6 +171,9 @@ func (r *MatchRepository) Update(ctx context.Context, m *domain.Match) error {
 		string(m.Status),
 		string(m.SubPolicy),
 		m.IsPollOpen,
+		m.TurfFee,
+		m.FeePerPlayer,
+		m.PostMatchPhotoURL,
 		m.Notes,
 		now,
 		m.ID,
