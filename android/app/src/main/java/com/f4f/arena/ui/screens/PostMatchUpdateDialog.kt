@@ -27,8 +27,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import com.f4f.arena.ui.theme.F4FColors
 import java.io.ByteArrayOutputStream
+import java.io.File
 
 @Composable
 fun PostMatchUpdateDialog(
@@ -41,13 +43,21 @@ fun PostMatchUpdateDialog(
     var turfFeeText by remember { mutableStateOf("") }
     var photoBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var photoDataUrl by remember { mutableStateOf<String?>(null) }
+    var pendingPhotoFile by remember { mutableStateOf<File?>(null) }
 
     val cameraLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.TakePicturePreview()
-    ) { bmp ->
-        if (bmp != null) {
-            photoBitmap = bmp
-            photoDataUrl = encodeBitmapToDataUrl(bmp)
+        ActivityResultContracts.TakePicture()
+    ) { success ->
+        val file = pendingPhotoFile
+        if (success && file != null && file.exists()) {
+            runCatching {
+                val decoded = BitmapFactory.decodeFile(file.absolutePath)
+                if (decoded != null) {
+                    val scaled = scaleBitmapMax(decoded, 1600)
+                    photoBitmap = scaled
+                    photoDataUrl = encodeBitmapToDataUrl(scaled)
+                }
+            }
         }
     }
 
@@ -59,7 +69,7 @@ fun PostMatchUpdateDialog(
                 context.contentResolver.openInputStream(uri)?.use { stream ->
                     val decoded = BitmapFactory.decodeStream(stream)
                     if (decoded != null) {
-                        val scaled = scaleBitmapMax(decoded, 960)
+                        val scaled = scaleBitmapMax(decoded, 1600)
                         photoBitmap = scaled
                         photoDataUrl = encodeBitmapToDataUrl(scaled)
                     }
@@ -85,7 +95,17 @@ fun PostMatchUpdateDialog(
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
-                        onClick = { cameraLauncher.launch(null) },
+                        onClick = {
+                            val dir = File(context.cacheDir, "photos").apply { mkdirs() }
+                            val file = File(dir, "match_photo_${System.currentTimeMillis()}.jpg")
+                            pendingPhotoFile = file
+                            val uri = FileProvider.getUriForFile(
+                                context,
+                                "${context.packageName}.fileprovider",
+                                file
+                            )
+                            cameraLauncher.launch(uri)
+                        },
                         shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.weight(1f)
                     ) {
@@ -105,13 +125,16 @@ fun PostMatchUpdateDialog(
                 }
 
                 if (photoBitmap != null) {
+                    val bmp = photoBitmap!!
+                    val ratio = (bmp.width.toFloat() / bmp.height.toFloat()).coerceIn(0.45f, 2.5f)
                     Image(
-                        bitmap = photoBitmap!!.asImageBitmap(),
+                        bitmap = bmp.asImageBitmap(),
                         contentDescription = "Post-match photo",
-                        contentScale = ContentScale.Crop,
+                        contentScale = ContentScale.Fit,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(140.dp)
+                            .heightIn(max = 260.dp)
+                            .aspectRatio(ratio)
                             .clip(RoundedCornerShape(14.dp))
                     )
                 }
@@ -160,6 +183,35 @@ fun PostMatchUpdateDialog(
     )
 }
 
+@Composable
+fun MatchPostPhoto(
+    photoUrl: String?,
+    modifier: Modifier = Modifier
+) {
+    val postPhoto = remember(photoUrl) { decodeDataUrlToBitmap(photoUrl) }
+    if (postPhoto != null) {
+        val ratio = (postPhoto.width.toFloat() / postPhoto.height.toFloat()).coerceIn(0.45f, 2.5f)
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xFF0F172A).copy(alpha = 0.04f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                bitmap = postPhoto.asImageBitmap(),
+                contentDescription = "Post-match squad photo",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 460.dp)
+                    .aspectRatio(ratio)
+                    .clip(RoundedCornerShape(16.dp))
+            )
+        }
+    }
+}
+
 fun decodeDataUrlToBitmap(dataUrl: String?): Bitmap? {
     if (dataUrl.isNullOrBlank()) return null
     val base64Part = dataUrl.substringAfter("base64,", "")
@@ -179,9 +231,9 @@ private fun scaleBitmapMax(src: Bitmap, maxDim: Int): Bitmap {
 }
 
 private fun encodeBitmapToDataUrl(bmp: Bitmap): String {
-    val scaled = scaleBitmapMax(bmp, 800)
+    val scaled = scaleBitmapMax(bmp, 1600)
     val out = ByteArrayOutputStream()
-    scaled.compress(Bitmap.CompressFormat.JPEG, 70, out)
+    scaled.compress(Bitmap.CompressFormat.JPEG, 86, out)
     val b64 = Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
     return "data:image/jpeg;base64,$b64"
 }

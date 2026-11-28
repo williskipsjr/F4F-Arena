@@ -194,11 +194,12 @@ private fun F4FArenaApp(
     } else null
     val isAdmin = sessionUi?.role == UserRole.ADMIN
 
-    fun loadFeedbackIfAdmin() {
-        if (!isAdmin) return
+    fun loadFeedback() {
         scope.launch {
             try {
-                val res = NetworkClient.feedbackApi.listFeedback(SessionManager.getBearerToken())
+                val res = NetworkClient.feedbackApi.listFeedback(
+                    SessionManager.getBearerToken().takeIf { it.isNotBlank() }
+                )
                 if (res.isSuccessful && res.body() != null) {
                     feedbackItems = res.body()!!.data.map {
                         FeedbackItemUi(
@@ -215,8 +216,8 @@ private fun F4FArenaApp(
         }
     }
 
-    LaunchedEffect(isAdmin) {
-        if (isAdmin) loadFeedbackIfAdmin()
+    LaunchedEffect(Unit) {
+        loadFeedback()
     }
 
     LaunchedEffect(authPromptRequired) {
@@ -557,7 +558,7 @@ private fun F4FArenaApp(
                                         )
                                         if (res.isSuccessful) {
                                             snackbarHostState.showSnackbar("Thanks! Feedback sent.")
-                                            loadFeedbackIfAdmin()
+                                            loadFeedback()
                                         } else {
                                             snackbarHostState.showSnackbar("Failed to send feedback (HTTP ${res.code()})")
                                         }
@@ -785,6 +786,7 @@ private fun F4FArenaApp(
             isLoading = votersLoading,
             isLoggedIn = isLoggedIn,
             isAdmin = isAdmin,
+            currentPlayerId = playerId,
             isPostingComment = postingComment,
             onRefresh = { openVotersForMatch(currentCard) },
             onPostComment = { msg ->
@@ -921,8 +923,10 @@ private fun Player.toUi(): PlayerUi = PlayerUi(
 
 private fun com.f4f.arena.data.model.MatchComment.toUi(): PollCommentUi = PollCommentUi(
     id = id,
+    playerId = playerId,
     authorName = authorName,
     isAdmin = authorRole.equals("ADMIN", ignoreCase = true),
+    avatarUrl = avatarUrl,
     message = message,
     createdAtLabel = formatIsoTimestamp(createdAt)
 )

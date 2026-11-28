@@ -21,14 +21,67 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.f4f.arena.ui.components.FootballLoadingAnimation
 import com.f4f.arena.ui.state.PollCommentUi
 import com.f4f.arena.ui.state.PollVoteUi
 import com.f4f.arena.ui.theme.F4FColors
+import kotlin.math.abs
 
 private enum class PollSheetTab { COMMENTS, VOTES }
+
+private val InitialAvatarPalette = listOf(
+    Color(0xFF1B4332),
+    Color(0xFF1D4ED8),
+    Color(0xFF7C3AED),
+    Color(0xFFB91C1C),
+    Color(0xFF0F766E),
+    Color(0xFFC2410C),
+    Color(0xFF4338CA),
+    Color(0xFFBE185D),
+    Color(0xFF0369A1),
+    Color(0xFF4D7C0F)
+)
+
+@Composable
+fun PlayerAvatarBadge(
+    name: String,
+    avatarUrl: String?,
+    size: Dp = 36.dp
+) {
+    val avatarBmp = remember(avatarUrl) { decodeDataUrlToBitmap(avatarUrl) }
+    if (avatarBmp != null) {
+        Image(
+            bitmap = avatarBmp.asImageBitmap(),
+            contentDescription = name,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(size)
+                .clip(CircleShape)
+        )
+    } else {
+        val normalized = name.trim().lowercase()
+        val colorIndex = if (normalized.isEmpty()) 0 else abs(normalized.hashCode()) % InitialAvatarPalette.size
+        val bgColor = InitialAvatarPalette[colorIndex]
+        val initial = name.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+        Box(
+            modifier = Modifier
+                .size(size)
+                .clip(CircleShape)
+                .background(bgColor),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = initial,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = (size.value * 0.42f).sp
+            )
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,6 +92,7 @@ fun PollVotersSheet(
     isLoading: Boolean = false,
     isLoggedIn: Boolean = false,
     isAdmin: Boolean = false,
+    currentPlayerId: String? = null,
     isPostingComment: Boolean = false,
     onRefresh: () -> Unit,
     onPostComment: (String) -> Unit = {},
@@ -196,9 +250,11 @@ fun PollVotersSheet(
                         }
                     } else {
                         items(comments, key = { it.id }) { comment ->
+                            val canDeleteComment = isAdmin ||
+                                (!currentPlayerId.isNullOrBlank() && comment.playerId == currentPlayerId)
                             CommentCard(
                                 comment = comment,
-                                canDelete = isAdmin,
+                                canDelete = canDeleteComment,
                                 onDelete = { onDeleteComment(comment.id) }
                             )
                         }
@@ -282,8 +338,14 @@ private fun CommentCard(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f)
                 ) {
+                    PlayerAvatarBadge(
+                        name = comment.authorName,
+                        avatarUrl = comment.avatarUrl,
+                        size = 30.dp
+                    )
                     Text(
                         comment.authorName,
                         style = MaterialTheme.typography.titleSmall,
@@ -337,7 +399,6 @@ private fun CommentCard(
 
 @Composable
 private fun VoterRowCard(vote: PollVoteUi) {
-    val avatarBmp = remember(vote.avatarUrl) { decodeDataUrlToBitmap(vote.avatarUrl) }
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = Color.White,
@@ -349,31 +410,11 @@ private fun VoterRowCard(vote: PollVoteUi) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (avatarBmp != null) {
-                    Image(
-                        bitmap = avatarBmp.asImageBitmap(),
-                        contentDescription = vote.playerName,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(F4FColors.ForestDeep),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = vote.playerName.take(2).uppercase(),
-                            color = F4FColors.PitchLime,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
-                    }
-                }
+                PlayerAvatarBadge(
+                    name = vote.playerName,
+                    avatarUrl = vote.avatarUrl,
+                    size = 36.dp
+                )
                 Column {
                     Text(vote.playerName, style = MaterialTheme.typography.titleMedium)
                     Text(

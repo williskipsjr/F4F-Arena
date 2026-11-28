@@ -59,8 +59,10 @@ data class PollVoteUi(
 
 data class PollCommentUi(
     val id: String,
+    val playerId: String? = null,
     val authorName: String,
     val isAdmin: Boolean,
+    val avatarUrl: String? = null,
     val message: String,
     val createdAtLabel: String
 )

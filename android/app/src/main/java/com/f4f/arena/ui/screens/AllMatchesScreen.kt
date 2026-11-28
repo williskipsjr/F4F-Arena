@@ -152,20 +152,9 @@ fun AllMatchesScreen(
                                 )
                             }
                         }
-                        Spacer(Modifier.height(14.dp))
-                        val postPhoto = remember(match.postMatchPhotoUrl) {
-                            decodeDataUrlToBitmap(match.postMatchPhotoUrl)
-                        }
-                        if (postPhoto != null) {
-                            Image(
-                                bitmap = postPhoto.asImageBitmap(),
-                                contentDescription = "Post-match squad photo",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(170.dp)
-                                    .clip(RoundedCornerShape(16.dp))
-                            )
+                        if (!match.postMatchPhotoUrl.isNullOrBlank()) {
+                            Spacer(Modifier.height(14.dp))
+                            MatchPostPhoto(photoUrl = match.postMatchPhotoUrl)
                             Spacer(Modifier.height(10.dp))
                         }
                         if (match.feePerPlayer != null && match.turfFee != null) {
