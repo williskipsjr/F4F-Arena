@@ -39,6 +39,7 @@ android {
         targetSdk = 34
         versionCode = 8
         versionName = "1.0.7"
+        base.archivesName.set("f4f-arena-v$versionName")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
