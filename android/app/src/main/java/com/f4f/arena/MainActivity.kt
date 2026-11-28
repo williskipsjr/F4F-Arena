@@ -310,8 +310,8 @@ private fun F4FArenaApp(
             it.title.contains(searchQuery, ignoreCase = true) ||
             it.venue.contains(searchQuery, ignoreCase = true)
     }
-    val featuredPoll = filteredMatchCards.firstOrNull { it.pollOpen } ?: filteredMatchCards.firstOrNull()
-    val exploreMatches = if (featuredPoll != null) filteredMatchCards.filter { it.id != featuredPoll.id } else filteredMatchCards
+    val featuredPoll = filteredMatchCards.firstOrNull { !it.isEnded } ?: filteredMatchCards.firstOrNull()
+    val recentEndedMatch = filteredMatchCards.firstOrNull { it.isEnded && it.id != featuredPoll?.id }
 
     val rawPlayers: List<Player> = (rosterState as? RosterUiState.Success)?.allPlayers ?: emptyList()
     val uiPlayers: List<PlayerUi> = rawPlayers.map { it.toUi() }
@@ -478,7 +478,7 @@ private fun F4FArenaApp(
                                 session = sessionUi,
                                 searchQuery = searchQuery,
                                 featuredPoll = featuredPoll,
-                                exploreMatches = exploreMatches,
+                                recentEndedMatch = recentEndedMatch,
                                 onSearchChange = { searchQuery = it },
                                 onAvatarClick = {
                                     if (isLoggedIn) selectedTab = F4FBottomTab.SYSTEM else showAuthSheet = true
