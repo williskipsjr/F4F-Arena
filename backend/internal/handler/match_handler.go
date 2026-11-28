@@ -344,11 +344,21 @@ func (h *MatchHandler) DeleteComment(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "DB_UNAVAILABLE", "Comments unavailable")
 		return
 	}
+	claims, ok := r.Context().Value(auth.AdminContextKey).(*auth.Claims)
+	if !ok || claims == nil {
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication required")
+		return
+	}
 	matchID := chi.URLParam(r, "id")
 	commentID := chi.URLParam(r, "commentId")
-	if err := h.voteRepo.DeleteComment(r.Context(), matchID, commentID); err != nil {
+	isAdmin := strings.EqualFold(claims.Role, "ADMIN")
+	if err := h.voteRepo.DeleteComment(r.Context(), matchID, commentID, claims.PlayerID, isAdmin); err != nil {
 		if errors.Is(err, postgres.ErrMatchNotFound) {
 			writeError(w, http.StatusNotFound, "NOT_FOUND", "Comment not found")
+			return
+		}
+		if errors.Is(err, postgres.ErrCommentForbidden) {
+			writeError(w, http.StatusForbidden, "FORBIDDEN", err.Error())
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to delete comment: "+err.Error())

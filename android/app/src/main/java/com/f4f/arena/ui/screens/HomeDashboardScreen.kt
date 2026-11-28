@@ -304,6 +304,11 @@ private fun FeaturedPollCard(
                 fontWeight = if (poll.isOngoing || poll.isEnded) FontWeight.SemiBold else FontWeight.Normal
             )
 
+            if (poll.isEnded && !poll.postMatchPhotoUrl.isNullOrBlank()) {
+                Spacer(Modifier.height(10.dp))
+                MatchPostPhoto(photoUrl = poll.postMatchPhotoUrl)
+            }
+
             if (poll.isEnded && poll.feePerPlayer != null && poll.turfFee != null) {
                 Spacer(Modifier.height(10.dp))
                 Box(
@@ -499,8 +504,29 @@ private fun ExploreMatchCard(
             Text(
                 text = "${match.timelineLabel} · ${match.inCount} IN · ${if (match.isEnded) "Completed" else if (match.finalised) "Finalised" else if (match.teamsReady) "Teams Ready" else "Draft"}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (match.isOngoing) F4FColors.ForestMid else F4FColors.TextSecondary
+                color = if (match.isEnded) Color(0xFFB91C1C) else if (match.isOngoing) F4FColors.ForestMid else F4FColors.TextSecondary
             )
+            if (match.isEnded && !match.postMatchPhotoUrl.isNullOrBlank()) {
+                Spacer(Modifier.height(10.dp))
+                MatchPostPhoto(photoUrl = match.postMatchPhotoUrl)
+            }
+            if (match.isEnded && match.feePerPlayer != null && match.turfFee != null) {
+                Spacer(Modifier.height(10.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFFFEE2E2))
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = "Payment Due: ₹${match.feePerPlayer} / player (Total ₹${match.turfFee})",
+                        color = Color(0xFF991B1B),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                }
+            }
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(

@@ -126,6 +126,9 @@ func main() {
 		r.Get("/api/v1/matches/{id}/teams", teamHandler.GetTeams)
 		r.Get("/api/v1/matches/{id}/whatsapp-export", teamHandler.GetWhatsAppExport)
 	}
+	if feedbackHandler != nil {
+		r.Get("/api/v1/feedback", feedbackHandler.List)
+	}
 
 	// Authenticated Routes (Players + Admin)
 	r.Group(func(authed chi.Router) {
@@ -141,6 +144,7 @@ func main() {
 		if matchHandler != nil {
 			authed.Post("/api/v1/matches/{id}/vote", matchHandler.CastVote)
 			authed.Post("/api/v1/matches/{id}/comments", matchHandler.PostComment)
+			authed.Delete("/api/v1/matches/{id}/comments/{commentId}", matchHandler.DeleteComment)
 		}
 		if feedbackHandler != nil {
 			authed.Post("/api/v1/feedback", feedbackHandler.Create)
@@ -149,9 +153,6 @@ func main() {
 		// Admin-only Mutations & Diagnostics
 		authed.Group(func(admin chi.Router) {
 			admin.Use(tokenService.RequireAdmin)
-			if feedbackHandler != nil {
-				admin.Get("/api/v1/feedback", feedbackHandler.List)
-			}
 			if playerHandler != nil {
 				admin.Post("/api/v1/players", playerHandler.Create)
 				admin.Patch("/api/v1/players/{id}", playerHandler.Update)
@@ -160,7 +161,6 @@ func main() {
 				admin.Post("/api/v1/matches", matchHandler.Create)
 				admin.Patch("/api/v1/matches/{id}", matchHandler.Update)
 				admin.Delete("/api/v1/matches/{id}", matchHandler.Delete)
-				admin.Delete("/api/v1/matches/{id}/comments/{commentId}", matchHandler.DeleteComment)
 				admin.Put("/api/v1/matches/{id}/attendees", matchHandler.SyncAttendees)
 				admin.Post("/api/v1/matches/{id}/attendees/late", matchHandler.AddLateArrival)
 				admin.Delete("/api/v1/matches/{id}/attendees/{playerId}", matchHandler.RemoveAttendee)

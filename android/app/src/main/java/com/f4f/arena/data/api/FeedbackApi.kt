@@ -18,6 +18,6 @@ interface FeedbackApi {
 
     @GET("api/v1/feedback")
     suspend fun listFeedback(
-        @Header("Authorization") bearerToken: String
+        @Header("Authorization") bearerToken: String? = null
     ): Response<FeedbackListResponse>
 }

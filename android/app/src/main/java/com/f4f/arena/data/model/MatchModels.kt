@@ -152,6 +152,7 @@ data class MatchComment(
     @SerializedName("player_id") val playerId: String? = null,
     @SerializedName("author_name") val authorName: String,
     @SerializedName("author_role") val authorRole: String,
+    @SerializedName("avatar_url") val avatarUrl: String? = null,
     @SerializedName("message") val message: String,
     @SerializedName("created_at") val createdAt: String
 )

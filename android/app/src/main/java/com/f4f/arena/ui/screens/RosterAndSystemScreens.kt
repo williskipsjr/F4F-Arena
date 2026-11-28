@@ -386,7 +386,7 @@ fun UpdatesAndFeedbackScreen(
             if (feedbackItems.isNotEmpty()) {
                 Surface(shape = RoundedCornerShape(22.dp), color = Color.White, modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("Admin · Community Feedback (${feedbackItems.size})", style = MaterialTheme.typography.titleMedium)
+                        Text("Community Feedback (${feedbackItems.size})", style = MaterialTheme.typography.titleMedium)
                         feedbackItems.forEach { item ->
                             Column(
                                 modifier = Modifier

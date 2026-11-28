@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "187484192919",
+    "project_id": "f4f-arena",
+    "storage_bucket": "f4f-arena.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:187484192919:android:dd2c3489d86952a21d29d2",
+        "android_client_info": {
+          "package_name": "com.f4f.arena"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCc4_BWT-bYgMKPWd8AqB9R8nyFEQUC-VE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
