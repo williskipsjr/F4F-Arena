@@ -48,8 +48,13 @@ func Load() *Config {
 		latestVersionCode = 1
 	}
 
+	serverPort := getEnv("SERVER_PORT", "")
+	if serverPort == "" {
+		serverPort = getEnv("PORT", "8080")
+	}
+
 	return &Config{
-		ServerPort:           getEnv("SERVER_PORT", "8080"),
+		ServerPort:           serverPort,
 		ServerEnv:            getEnv("SERVER_ENV", "development"),
 		DatabaseURL:          dbURL,
 		AdminUsername:        getEnv("ADMIN_USERNAME", "admin"),
